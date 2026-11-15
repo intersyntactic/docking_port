@@ -22,12 +22,12 @@
 /// arrival now.
 library;
 
-import 'package:is_airlock_api/is_airlock_api.dart' show JourneyPathId;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
-import 'package:is_shapes/is_shapes.dart' show ActorId, JourneyId;
+import 'package:is_shapes/is_shapes.dart'
+    show ActorId, JourneyId, JourneyPathId;
 
 import 'reading.dart';
 

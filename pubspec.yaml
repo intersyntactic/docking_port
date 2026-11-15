@@ -10,7 +10,6 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
-  is_airlock_api: ^0.2.0
   # Response (is_annotation_shapes 0.2.1) isn't published yet: pinned to
   # https://github.com/intersyntactic/annotation_shapes/pull/11's head until
   # it is, then ^0.2.1.
@@ -20,7 +19,7 @@ dependencies:
       ref: 4f2759894f6ae37211bece1becaf8ea1a629b897
   is_conversation_shapes: ^0.4.0
   is_journal: ^0.5.0
-  is_shapes: ^0.4.1
+  is_shapes: ^0.4.2
 
 dev_dependencies:
   lints: ^6.1.0
