@@ -8,6 +8,7 @@ import 'package:is_airlock_api/is_airlock_api.dart' show JourneyPathId;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
+import 'package:is_shapes/is_shapes.dart' show JourneyId;
 
 import 'decision.dart';
 import 'reading.dart';
@@ -37,6 +38,11 @@ abstract interface class Decided {
   /// yet.
   JourneyPathId? journeyPathOf(Conversation conversation);
 
+  /// The journey [outside] is: a conversation others sit within, such as a
+  /// channel, or one that sits within nothing, such as a chat. Null before
+  /// it starts.
+  JourneyId? journeyOf(Conversation outside);
+
   /// The journey path the message [message] in [conversation] was admitted
   /// under: where a change to it goes. Null when it was never admitted.
   JourneyPathId? journeyPathOfMessage(
@@ -44,7 +50,7 @@ abstract interface class Decided {
     SourceMessageId message,
   );
 
-  /// Takes in [decision], recorded at [entry]. An [Admitted] that
-  /// [StartsJourneyPath] names its journey path by [entry].
+  /// Takes in [decision], recorded at [entry]. An [Admitted] that starts a
+  /// journey path or a journey names it by [entry].
   void take(EntryHash entry, Decision decision);
 }

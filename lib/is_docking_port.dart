@@ -7,7 +7,7 @@
 /// So far, the reading contract: a module's [ModuleReading], a fold over
 /// its relay's [Arrival]s that names what each one is, a [Reading]. And,
 /// as types to agree on before the logic: the [Decision] recorded for each
-/// arrival, [Admitted] or [Declined]; the rules passed in, [PlacementRule]
+/// arrival, [Admitted] or [Declined]; the rules passed in, [JourneyRule]
 /// and [TurnRule]; and [Decided], what the decisions add up to when read
 /// back.
 ///
