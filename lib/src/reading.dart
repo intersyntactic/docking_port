@@ -13,7 +13,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
-    show SourceMessageId;
+    show SourceMessageId, UserSaid;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
 
@@ -110,17 +110,13 @@ final class NothingToAdmit extends Reading {
 /// An arrival the docking port may admit, and what it needs to decide
 /// whether to.
 sealed class Admissible extends Reading {
-  const Admissible({
-    required this.conversation,
-    required this.from,
-    required this.key,
-  });
+  const Admissible({required this.conversation, required this.key});
 
   /// The outside conversation it belongs to.
   final Conversation conversation;
 
   /// Who it comes from, or null for no one the module can name.
-  final ActorId? from;
+  ActorId? get from;
 
   /// What "not admitted twice" compares, within [conversation]: the same
   /// for every delivery of one event, and different for two events,
@@ -128,18 +124,29 @@ sealed class Admissible extends Reading {
   final ArrivalKey key;
 }
 
-/// [message] was said. Whether it starts a turn is the docking port's
-/// decision, under the journey path's rules.
+/// Something said, as [node], the node the journey path's apex appends.
+/// Whether it starts a turn is the docking port's decision, under the
+/// journey path's rules.
+///
+/// The reading builds [node] because only its fold holds what that takes,
+/// such as who wrote a message it quotes (Nick, 2026-11-15: the reading
+/// carries the node). Someone the module can't name has said nothing it
+/// can admit, since a [UserSaid] always has an author.
 final class Said extends Admissible {
   const Said({
     required super.conversation,
-    required super.from,
     required super.key,
-    required this.message,
+    required this.node,
   });
 
-  /// The message, as the `UserSaid` made from it names it.
-  final SourceMessageId message;
+  /// What was said.
+  final UserSaid node;
+
+  @override
+  ActorId get from => node.author;
+
+  /// The message, as [node] names it.
+  SourceMessageId get message => node.source;
 }
 
 /// A change to [message], said earlier: an edit, or a delete. It is
@@ -147,10 +154,13 @@ final class Said extends Admissible {
 final class Changed extends Admissible {
   const Changed({
     required super.conversation,
-    required super.from,
+    required this.from,
     required super.key,
     required this.message,
   });
+
+  @override
+  final ActorId? from;
 
   /// The message changed.
   final SourceMessageId message;
@@ -160,10 +170,13 @@ final class Changed extends Admissible {
 final class Joined extends Admissible {
   const Joined._({
     required super.conversation,
-    required super.from,
+    required this.from,
     required super.key,
     required this.joiners,
   });
+
+  @override
+  final ActorId? from;
 
   /// Who joined; never empty.
   final List<ActorId> joiners;
