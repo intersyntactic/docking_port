@@ -10,6 +10,7 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  is_airlock_api: ^0.2.0
   is_conversation_shapes: ^0.4.0
   is_journal: ^0.5.0
   is_shapes: ^0.4.0
