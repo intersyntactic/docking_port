@@ -110,10 +110,24 @@ final class NothingToAdmit extends Reading {
 /// An arrival the docking port may admit, and what it needs to decide
 /// whether to.
 sealed class Admissible extends Reading {
-  const Admissible({required this.conversation, required this.key});
+  const Admissible({
+    required this.conversation,
+    required this.within,
+    required this.key,
+  });
 
   /// The outside conversation it belongs to.
   final Conversation conversation;
+
+  /// The conversation [conversation] sits inside, such as the channel a
+  /// thread is in. Null when it sits inside none, as a chat or a channel
+  /// itself does.
+  ///
+  /// It is what the outside groups its conversations by: a channel is a
+  /// journey and each of its threads a journey path (Nick, 2026-11-15:
+  /// "channel = journey, thread = journey path"). The reading names it so
+  /// the docking port never reads a module's ids to find it.
+  final Conversation? within;
 
   /// Who it comes from, or null for no one the module can name.
   ActorId? get from;
@@ -135,6 +149,7 @@ sealed class Admissible extends Reading {
 final class Said extends Admissible {
   const Said({
     required super.conversation,
+    required super.within,
     required super.key,
     required this.node,
   });
@@ -154,6 +169,7 @@ final class Said extends Admissible {
 final class Changed extends Admissible {
   const Changed({
     required super.conversation,
+    required super.within,
     required this.from,
     required super.key,
     required this.message,
@@ -170,6 +186,7 @@ final class Changed extends Admissible {
 final class Joined extends Admissible {
   const Joined._({
     required super.conversation,
+    required super.within,
     required this.from,
     required super.key,
     required this.joiners,
@@ -185,6 +202,7 @@ final class Joined extends Admissible {
   /// [NothingToAdmit].
   static Joined? of({
     required Conversation conversation,
+    required Conversation? within,
     required ActorId? from,
     required ArrivalKey key,
     required Iterable<ActorId> joiners,
@@ -193,6 +211,7 @@ final class Joined extends Admissible {
     if (list.isEmpty) return null;
     return Joined._(
       conversation: conversation,
+      within: within,
       from: from,
       key: key,
       joiners: list,
@@ -200,8 +219,9 @@ final class Joined extends Admissible {
   }
 }
 
-/// An outside conversation: a Teams chat, a Slack channel. What the
-/// docking port keeps under a journey path.
+/// An outside conversation: a Teams chat, channel or channel thread, a
+/// Slack channel. The docking port keeps each one under a journey path,
+/// and one that others sit inside, such as a channel, as a journey.
 ///
 /// Written like an [ActorId], a source, a colon and the rest, such as
 /// `teams:19:abc@thread.v2`, so two modules never name two conversations
