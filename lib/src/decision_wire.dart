@@ -10,14 +10,17 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
-    show ActorId, JourneyId, JourneyPathId;
+    show ActorId, DecidedBy, JourneyId, JourneyPathId;
 
 import 'decision.dart';
 import 'reading.dart';
 
 /// [decision] as the entry the docking port sends: its kind, and its body.
 (Kind, Uint8List) encodeDecision(Decision decision) {
-  final json = <String, Object?>{'arrival': decision.arrival.hex};
+  final json = <String, Object?>{
+    'arrival': decision.arrival.hex,
+    'by': decision.by.name,
+  };
   switch (decision) {
     case Admitted():
       json
@@ -88,17 +91,25 @@ Decision? decodeDecision(Kind kind, Uint8List body) {
   }
   if (json is! Map<String, Object?>) return null;
   final arrival = _read(json['arrival'], EntryHash.parse);
-  if (arrival == null) return null;
-  if (kind == DecisionKind.admitted) return _admitted(arrival, json);
-  if (kind == DecisionKind.declined) return _declined(arrival, json);
+  final by = _read(json['by'], _decidedBy);
+  if (arrival == null || by == null) return null;
+  if (kind == DecisionKind.admitted) return _admitted(arrival, by, json);
+  if (kind == DecisionKind.declined) return _declined(arrival, by, json);
   return null;
 }
 
-Admitted? _admitted(EntryHash arrival, Map<String, Object?> json) {
+/// The [DecidedBy] named [name]; null for any other name.
+DecidedBy? _decidedBy(String name) => DecidedBy.values.asNameMap()[name];
+
+Admitted? _admitted(
+  EntryHash arrival,
+  DecidedBy by,
+  Map<String, Object?> json,
+) {
   final conversation = _read(json['conversation'], Conversation.parse);
   final key = _read(json['key'], ArrivalKey.parse);
   if (conversation == null || key == null) return null;
-  final fields = {'arrival', 'conversation', 'key'};
+  final fields = {'arrival', 'by', 'conversation', 'key'};
 
   // An optional field: absent, or present and well formed.
   T? optional<T extends Object>(String name, T? Function(String) parse) {
@@ -112,7 +123,7 @@ Admitted? _admitted(EntryHash arrival, Map<String, Object?> json) {
   final message = optional('message', SourceMessageId.parse);
   // A field that is present but malformed is in [fields] and read as null,
   // so the two counts differ.
-  if (fields.length != 3 + [within, from, message].nonNulls.length) {
+  if (fields.length != 4 + [within, from, message].nonNulls.length) {
     return null;
   }
 
@@ -136,6 +147,7 @@ Admitted? _admitted(EntryHash arrival, Map<String, Object?> json) {
   if (json.length != fields.length) return null;
   return Admitted(
     arrival,
+    by: by,
     conversation: conversation,
     within: within,
     key: key,
@@ -160,12 +172,18 @@ JourneyPlacement? _readJourney(Map<String, Object?> json, Set<String> fields) {
   return const StartsJourney();
 }
 
-Declined? _declined(EntryHash arrival, Map<String, Object?> json) {
+Declined? _declined(
+  EntryHash arrival,
+  DecidedBy by,
+  Map<String, Object?> json,
+) {
   final why = json['why'];
   if (why is! String) return null;
   if (why == 'unread' || why == 'not-admissible') {
-    if (json.length != 2) return null;
-    return why == 'unread' ? Unread(arrival) : NotAdmissible(arrival);
+    if (json.length != 3) return null;
+    return why == 'unread'
+        ? Unread(arrival, by: by)
+        : NotAdmissible(arrival, by: by);
   }
   final conversation = _read(json['conversation'], Conversation.parse);
   final key = _read(json['key'], ArrivalKey.parse);
@@ -173,27 +191,45 @@ Declined? _declined(EntryHash arrival, Map<String, Object?> json) {
   switch (why) {
     case 'duplicate':
       final of = _read(json['of'], EntryHash.parse);
-      if (of == null || json.length != 5) return null;
-      return Duplicate(arrival, conversation: conversation, key: key, of: of);
+      if (of == null || json.length != 6) return null;
+      return Duplicate(
+        arrival,
+        by: by,
+        conversation: conversation,
+        key: key,
+        of: of,
+      );
     case 'changes-unadmitted':
       final message = _read(json['message'], SourceMessageId.parse);
-      if (message == null || json.length != 5) return null;
+      if (message == null || json.length != 6) return null;
       return ChangesUnadmitted(
         arrival,
+        by: by,
         conversation: conversation,
         key: key,
         message: message,
       );
     case 'not-taken-in' || 'not-a-turn' || 'responds-unplaced':
-      if (json.length != 4) return null;
+      if (json.length != 5) return null;
       return switch (why) {
         'not-taken-in' => NotTakenIn(
           arrival,
+          by: by,
           conversation: conversation,
           key: key,
         ),
-        'not-a-turn' => NotATurn(arrival, conversation: conversation, key: key),
-        _ => RespondsUnplaced(arrival, conversation: conversation, key: key),
+        'not-a-turn' => NotATurn(
+          arrival,
+          by: by,
+          conversation: conversation,
+          key: key,
+        ),
+        _ => RespondsUnplaced(
+          arrival,
+          by: by,
+          conversation: conversation,
+          key: key,
+        ),
       };
     default:
       return null;

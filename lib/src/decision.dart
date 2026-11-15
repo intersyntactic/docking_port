@@ -27,7 +27,7 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
-    show ActorId, JourneyId, JourneyPathId;
+    show ActorId, DecidedBy, JourneyId, JourneyPathId;
 
 import 'reading.dart';
 
@@ -95,12 +95,20 @@ final class StartsJourney extends JourneyPlacement {
   const StartsJourney();
 }
 
-/// What the docking port decided about the `arrived` entry [arrival].
+/// What the docking port decided about the `arrived` entry [arrival], and
+/// [by] whom, so the record tells "the rules let it through" from "the
+/// person said yes", as the airlock's does.
+///
+/// Every entry says who, as `"by": <who>`, where `<who>` is `rules` or
+/// `person`.
 sealed class Decision {
-  const Decision(this.arrival);
+  const Decision(this.arrival, {required this.by});
 
   /// The `arrived` entry decided.
   final EntryHash arrival;
+
+  /// Who decided it.
+  final DecidedBy by;
 }
 
 /// [arrival] admitted by [placement]: the event [key] in [conversation],
@@ -108,7 +116,7 @@ sealed class Decision {
 ///
 /// The entry, of kind `admitted`:
 ///
-///     {"arrival": <hex>, "conversation": <id>, "within": <id>?,
+///     {"arrival": <hex>, "by": <who>, "conversation": <id>, "within": <id>?,
 ///      "key": <key>, "from": <actor id>?, "message": <source>?,
 ///      ...the placement}
 ///
@@ -123,6 +131,7 @@ sealed class Decision {
 final class Admitted extends Decision {
   const Admitted(
     super.arrival, {
+    required super.by,
     required this.conversation,
     required this.within,
     required this.key,
@@ -147,24 +156,24 @@ final class Admitted extends Decision {
 ///
 /// The entry, of kind `declined`:
 ///
-///     {"arrival": <hex>, "why": <case>, ...the case's own fields}
+///     {"arrival": <hex>, "by": <who>, "why": <case>, ...the case's own fields}
 ///
 /// `<case>` is `unread`, `not-admissible`, `duplicate`, `not-taken-in`,
 /// `not-a-turn`, `responds-unplaced` or `changes-unadmitted`.
 sealed class Declined extends Decision {
-  const Declined(super.arrival);
+  const Declined(super.arrival, {required super.by});
 }
 
 /// No reading takes the arrival's source, or its body is not what a relay
 /// records. A source whose module has no reading yet has its arrivals
 /// declined, so a reading added later starts from what arrives after it.
 final class Unread extends Declined {
-  const Unread(super.arrival);
+  const Unread(super.arrival, {required super.by});
 }
 
 /// The module's reading found nothing to admit.
 final class NotAdmissible extends Declined {
-  const NotAdmissible(super.arrival);
+  const NotAdmissible(super.arrival, {required super.by});
 }
 
 /// An event a reading named, declined. It is decided once whichever way
@@ -173,6 +182,7 @@ final class NotAdmissible extends Declined {
 sealed class DeclinedEvent extends Declined {
   const DeclinedEvent(
     super.arrival, {
+    required super.by,
     required this.conversation,
     required this.key,
   });
@@ -186,6 +196,7 @@ sealed class DeclinedEvent extends Declined {
 final class Duplicate extends DeclinedEvent {
   const Duplicate(
     super.arrival, {
+    required super.by,
     required super.conversation,
     required super.key,
     required this.of,
@@ -199,6 +210,7 @@ final class Duplicate extends DeclinedEvent {
 final class NotTakenIn extends DeclinedEvent {
   const NotTakenIn(
     super.arrival, {
+    required super.by,
     required super.conversation,
     required super.key,
   });
@@ -208,6 +220,7 @@ final class NotTakenIn extends DeclinedEvent {
 final class NotATurn extends DeclinedEvent {
   const NotATurn(
     super.arrival, {
+    required super.by,
     required super.conversation,
     required super.key,
   });
@@ -218,6 +231,7 @@ final class NotATurn extends DeclinedEvent {
 final class RespondsUnplaced extends DeclinedEvent {
   const RespondsUnplaced(
     super.arrival, {
+    required super.by,
     required super.conversation,
     required super.key,
   });
@@ -228,6 +242,7 @@ final class RespondsUnplaced extends DeclinedEvent {
 final class ChangesUnadmitted extends DeclinedEvent {
   const ChangesUnadmitted(
     super.arrival, {
+    required super.by,
     required super.conversation,
     required super.key,
     required this.message,
