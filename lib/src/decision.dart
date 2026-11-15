@@ -150,7 +150,7 @@ final class Admitted extends Decision {
 ///     {"arrival": <hex>, "why": <case>, ...the case's own fields}
 ///
 /// `<case>` is `unread`, `not-admissible`, `duplicate`, `not-taken-in`,
-/// `not-a-turn` or `changes-unadmitted`.
+/// `not-a-turn`, `responds-unplaced` or `changes-unadmitted`.
 sealed class Declined extends Decision {
   const Declined(super.arrival);
 }
@@ -207,6 +207,16 @@ final class NotTakenIn extends DeclinedEvent {
 /// Something said that the turn rule says starts no turn.
 final class NotATurn extends DeclinedEvent {
   const NotATurn(
+    super.arrival, {
+    required super.conversation,
+    required super.key,
+  });
+}
+
+/// A response in [conversation], which is under no journey path, so no turn
+/// of the agent's there could have shown what was responded to.
+final class RespondsUnplaced extends DeclinedEvent {
+  const RespondsUnplaced(
     super.arrival, {
     required super.conversation,
     required super.key,

@@ -65,11 +65,15 @@ For each arrival, the reading names:
   define.
 - **Joined** (`Joined`): people or the agent joined a conversation. Never
   empty: a join of no one is nothing to admit.
-- **Responded**: a person's response to something the agent showed them, such
-  as Approve, Not yet or a correction on a card. It is named for what it says,
-  not for the button: a Slack button would be the same thing. It always names
-  who responded. *Coming:* Nick decided it on 15 Nov, and it enters the
-  contract once annotation_shapes defines the response in message terms.
+- **Responded** (`Responded`): a person's response to something the agent
+  showed them, such as Approve, Not yet or a proposed correction on a card.
+  It is named for what it says, not for the button: a Slack button would be
+  the same thing. It names the message responded to, and the response as
+  is_annotation_shapes' `Response`: `Approved`, `HeldOff` or `Proposed`. As
+  with a change, the journey path's agent loop builds the annotation (an
+  `Approval`, a `Seen`, a `Correction`) once it knows which turn the message
+  showed. A response always names who responded, since a response from no
+  one approves nothing.
 - **Nothing to admit** (`NothingToAdmit`): a typing indicator, a reaction the
   module doesn't carry, anything it can't read.
 
@@ -104,5 +108,5 @@ uses the same one.
 - **Proposed, not agreed:** admission, meaning the decision recorded for each
   arrival, the rules passed in, and rebuilding from the record
   (https://github.com/intersyntactic/docking_port/pull/2).
-- **Coming:** `Responded`; what a `Changed` message became; handing admitted
-  arrivals to a journey path's agent loop.
+- **Coming:** what a `Changed` message became; handing admitted arrivals to
+  a journey path's agent loop.
