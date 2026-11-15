@@ -91,8 +91,8 @@ in it and its journey paths, and a journey path is one agent's thread.
 A journey starts with the first thread admitted under it. It needs no join of
 its own: an arrival from a conversation already shows the agent is in it. A
 join is kept in the journey of the conversation it arrives in, even when it
-means more. In Teams, adding the agent to a team arrives once, in the team's
-General channel.
+means more, as a Teams join does when the agent is added to a whole team.
+How that arrives is Teams' business, so it's in teams_module's README.
 
 ## What a module never does
 
