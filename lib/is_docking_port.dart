@@ -1,19 +1,19 @@
 /// The docking port, a core piece of intersyntactic (RULINGS, "The docking
-/// port admits arrivals under journey paths"): it reads arrivals from the
+/// port admits events under journey paths"): it reads events from the
 /// record in order and admits each one under a journey path, deciding which
-/// journey path an outside conversation belongs to, whether an arrival
-/// starts a turn, and that none is admitted twice.
+/// journey path an outside conversation belongs to, whether an event starts
+/// a turn, and that none is admitted twice.
 ///
 /// So far: the reading contract, a module's [ModuleReading], a fold over
-/// its relay's [Arrival]s that names what each one is, a [Reading]. The
-/// [Decision] recorded for each arrival, [Admitted] or [Declined], as
+/// its relay's [Event]s that names what each one is, a [Reading]. The
+/// [Decision] recorded for each event, [Admitted] or [Declined], as
 /// [encodeDecision] writes it and [decodeDecision] reads it back; [decide],
 /// which makes one under the rules passed in, [JourneyRule] and [TurnRule];
 /// [Decided], what the decisions add up to when read back; and
 /// [runDockingPort], which follows the record and sends each decision to
 /// it.
 ///
-/// Not here yet: handing an arrival to a journey path's apex.
+/// Not here yet: handing an event to a journey path's apex.
 library;
 
 export 'src/decide.dart';

@@ -2,8 +2,8 @@
 /// gives.
 ///
 /// A module takes part only by describing (RULINGS, "The docking port admits
-/// arrivals under journey paths"). The docking port hands its
-/// [ModuleReading] every arrival from the module's relay, in the record's
+/// events under journey paths"). The docking port hands its
+/// [ModuleReading] every event from the module's relay, in the record's
 /// order, and for each the reading says what it is: a [Reading]. The
 /// docking port never reads a module's bytes itself, and the module never
 /// learns which journey path anything went to.
@@ -14,24 +14,26 @@ import 'dart:typed_data';
 
 import 'package:is_annotation_shapes/is_annotation_shapes.dart' show Response;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
-    show SourceMessageId, UserSaid;
+    show SourceMessageId, UserSaid, WhatChanged;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
 
-/// One `arrived` entry, as the docking port gives it to a reading: the
-/// entry's hash, and what its relay recorded, `{"at", "source", "bytes"}`.
+/// One event, as the docking port gives it to a reading: its entry's hash,
+/// and what its relay recorded, `{"at", "source", "bytes"}`. The record
+/// names these entries `arrived` until its writer takes a new name (Nick,
+/// 16 Nov: "It's an event, not an arrival").
 ///
-/// Only [Arrival.read] makes one, from the entry's body as recorded.
-final class Arrival {
-  const Arrival._({
+/// Only [Event.read] makes one, from the entry's body as recorded.
+final class Event {
+  const Event._({
     required this.entry,
     required this.at,
     required this.source,
     required this.bytes,
   });
 
-  /// The `arrived` entry's hash: what an admission and the turn made from
-  /// it name the arrival by.
+  /// The entry's hash: what an admission and the turn made from it name
+  /// the event by.
   final EntryHash entry;
 
   /// When the relay took it in.
@@ -43,9 +45,9 @@ final class Arrival {
   /// The bytes exactly as they came.
   final Uint8List bytes;
 
-  /// The `arrived` entry [entry], from its [body] as the relay recorded it.
+  /// The event recorded at [entry], from its [body] as the relay recorded it.
   /// Null for anything else: it is our own wire, read strictly.
-  static Arrival? read(EntryHash entry, Uint8List body) {
+  static Event? read(EntryHash entry, Uint8List body) {
     final Object? json;
     try {
       json = jsonDecode(utf8.decode(body));
@@ -67,35 +69,35 @@ final class Arrival {
         return null;
       }
       if (when == null || source.isEmpty) return null;
-      return Arrival._(entry: entry, at: when, source: source, bytes: raw);
+      return Event._(entry: entry, at: when, source: source, bytes: raw);
     }
     return null;
   }
 }
 
-/// A module's reading of its relay's arrivals, as a fold: the docking port
-/// starts from [start] and calls [step] with each arrival from [source], in
+/// A module's reading of its relay's events, as a fold: the docking port
+/// starts from [start] and calls [step] with each event from [source], in
 /// the record's order, keeping only the state it returns.
 ///
 /// [S] is the module's own, and the docking port never looks inside it. It
-/// is there for what a reading needs from earlier arrivals: a quote's
+/// is there for what a reading needs from earlier events: a quote's
 /// author, the message an edit or delete is of, who an earlier join brought
 /// in. On every start the docking port folds again from the record's
-/// beginning, already-admitted arrivals included, so [step] must give the
-/// same answer for the same arrivals in the same order, and must not change
+/// beginning, already-admitted events included, so [step] must give the
+/// same answer for the same events in the same order, and must not change
 /// the state it is given.
 abstract interface class ModuleReading<S> {
-  /// The [Arrival.source] whose arrivals this reads.
+  /// The [Event.source] whose events this reads.
   String get source;
 
-  /// The state before any arrival.
+  /// The state before any event.
   S get start;
 
-  /// [arrival] read, after every earlier one from [source] has been.
-  (S, Reading) step(S state, Arrival arrival);
+  /// [event] read, after every earlier one from [source] has been.
+  (S, Reading) step(S state, Event event);
 }
 
-/// What one arrival is: something said ([Said]), a change to an earlier
+/// What one event is: something said ([Said]), a change to an earlier
 /// message ([Changed]), a conversation joined ([Joined]), a response to
 /// something the agent showed ([Responded]), or nothing to admit
 /// ([NothingToAdmit]).
@@ -109,7 +111,7 @@ final class NothingToAdmit extends Reading {
   const NothingToAdmit();
 }
 
-/// An arrival the docking port may admit, and what it needs to decide
+/// An event the docking port may admit, and what it needs to decide
 /// whether to.
 sealed class Admissible extends Reading {
   const Admissible({
@@ -135,9 +137,9 @@ sealed class Admissible extends Reading {
   ActorId? get from;
 
   /// What "not admitted twice" compares, within [conversation]: the same
-  /// for every delivery of one event, and different for two events,
-  /// including two changes to one message.
-  final ArrivalKey key;
+  /// for two events that record one thing, as a redelivery does, and
+  /// different for two things, including two changes to one message.
+  final EventKey key;
 }
 
 /// Something said, as [node], the node the journey path's apex appends.
@@ -166,8 +168,12 @@ final class Said extends Admissible {
   SourceMessageId get message => node.source;
 }
 
-/// A change to [message], said earlier: an edit, or a delete. It is
-/// matched to the arrival that said [message].
+/// A change to [message], said earlier: an edit, a delete or a restore, as
+/// [change] says. It is matched to the event that said [message].
+///
+/// It is admitted whoever made it. Whether it counts is for whatever reads
+/// it: a change counts only when [from] is who said [message] (Nick, 16
+/// Nov, the rule `Withdrawal` keeps).
 final class Changed extends Admissible {
   const Changed({
     required super.conversation,
@@ -175,6 +181,7 @@ final class Changed extends Admissible {
     required this.from,
     required super.key,
     required this.message,
+    required this.change,
   });
 
   @override
@@ -182,9 +189,13 @@ final class Changed extends Admissible {
 
   /// The message changed.
   final SourceMessageId message;
+
+  /// What [message] became: what it says now, or that it was deleted or
+  /// restored, in message terms, before anything maps it to a turn.
+  final WhatChanged change;
 }
 
-/// [joiners] joined [conversation]. One arrival may bring in several.
+/// [joiners] joined [conversation]. One event may bring in several.
 final class Joined extends Admissible {
   const Joined._({
     required super.conversation,
@@ -206,7 +217,7 @@ final class Joined extends Admissible {
     required Conversation conversation,
     required Conversation? within,
     required ActorId? from,
-    required ArrivalKey key,
+    required EventKey key,
     required Iterable<ActorId> joiners,
   }) {
     final list = List<ActorId>.unmodifiable(joiners);
@@ -282,18 +293,18 @@ final class Conversation {
 
 /// One event's key within its conversation, in the module's own terms. Not
 /// a message's id: an edit is a second event about the same message.
-final class ArrivalKey {
-  const ArrivalKey._(this.value);
+final class EventKey {
+  const EventKey._(this.value);
 
   /// The key, as text.
   final String value;
 
-  /// [s] as an arrival key; null when empty or with whitespace.
-  static ArrivalKey? parse(String s) =>
-      s.isNotEmpty && !s.contains(RegExp(r'\s')) ? ArrivalKey._(s) : null;
+  /// [s] as an event key; null when empty or with whitespace.
+  static EventKey? parse(String s) =>
+      s.isNotEmpty && !s.contains(RegExp(r'\s')) ? EventKey._(s) : null;
 
   @override
-  bool operator ==(Object other) => other is ArrivalKey && other.value == value;
+  bool operator ==(Object other) => other is EventKey && other.value == value;
 
   @override
   int get hashCode => value.hashCode;

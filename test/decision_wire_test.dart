@@ -14,15 +14,15 @@ import 'package:is_shapes/is_shapes.dart'
 import 'package:test/test.dart';
 
 final _a = 'a' * 64, _b = 'b' * 64, _c = 'c' * 64;
-final arrival = EntryHash.parse(_a)!;
+final event = EntryHash.parse(_a)!;
 final conversation = Conversation.parse('teams:19:x;messageid=1')!;
 final within = Conversation.parse('teams:19:x')!;
-final key = ArrivalKey.parse('message:1')!;
+final key = EventKey.parse('message:1')!;
 final from = ActorId.parse('teams:t/p')!;
 final message = SourceMessageId.parse('19:x;messageid=1|1')!;
 
 Admitted _admitted(Placement placement, DecidedBy by) => Admitted(
-  arrival,
+  event,
   by: by,
   conversation: conversation,
   within: within,
@@ -42,7 +42,7 @@ void main() {
     expect(entry.$1, DecisionKind.admitted);
     expect(
       _text(entry),
-      '{"arrival":"$_a","by":"rules",'
+      '{"event":"$_a","by":"rules",'
       '"conversation":"teams:19:x;messageid=1",'
       '"key":"message:1","within":"teams:19:x","from":"teams:t/p",'
       '"message":"19:x;messageid=1|1","startsJourneyPath":true,'
@@ -53,7 +53,7 @@ void main() {
   test('an admission the person said yes to', () {
     final entry = encodeDecision(
       Admitted(
-        arrival,
+        event,
         by: DecidedBy.person,
         conversation: within,
         within: null,
@@ -66,7 +66,7 @@ void main() {
     expect(entry.$1, DecisionKind.admitted);
     expect(
       _text(entry),
-      '{"arrival":"$_a","by":"person","conversation":"teams:19:x",'
+      '{"event":"$_a","by":"person","conversation":"teams:19:x",'
       '"key":"message:1","startsJourneyPath":true,"startsJourney":true}',
     );
   });
@@ -74,7 +74,7 @@ void main() {
   test('a duplicate', () {
     final entry = encodeDecision(
       Duplicate(
-        arrival,
+        event,
         by: DecidedBy.rules,
         conversation: conversation,
         key: key,
@@ -84,7 +84,7 @@ void main() {
     expect(entry.$1, DecisionKind.declined);
     expect(
       _text(entry),
-      '{"arrival":"$_a","by":"rules","why":"duplicate",'
+      '{"event":"$_a","by":"rules","why":"duplicate",'
       '"conversation":"teams:19:x;messageid=1","key":"message:1","of":"$_b"}',
     );
   });
@@ -98,7 +98,7 @@ void main() {
         _admitted(StartsJourneyPath(InJourney(journey)), by),
         _admitted(const StartsJourneyPath(StartsJourney()), by),
         Admitted(
-          arrival,
+          event,
           by: by,
           conversation: within,
           within: null,
@@ -108,20 +108,20 @@ void main() {
           placement: IntoJourney(InJourney(journey)),
         ),
         _admitted(const IntoJourney(StartsJourney()), by),
-        Unread(arrival, by: by),
-        NotAdmissible(arrival, by: by),
+        Unread(event, by: by),
+        NotAdmissible(event, by: by),
         Duplicate(
-          arrival,
+          event,
           by: by,
           conversation: conversation,
           key: key,
-          of: arrival,
+          of: event,
         ),
-        NotTakenIn(arrival, by: by, conversation: conversation, key: key),
-        NotATurn(arrival, by: by, conversation: conversation, key: key),
-        RespondsUnplaced(arrival, by: by, conversation: conversation, key: key),
+        NotTakenIn(event, by: by, conversation: conversation, key: key),
+        NotATurn(event, by: by, conversation: conversation, key: key),
+        RespondsUnplaced(event, by: by, conversation: conversation, key: key),
         ChangesUnadmitted(
-          arrival,
+          event,
           by: by,
           conversation: conversation,
           key: key,
@@ -142,7 +142,7 @@ void main() {
     Uint8List bytes(Map<String, Object?> json) =>
         Uint8List.fromList(utf8.encode(jsonEncode(json)));
     final good = {
-      'arrival': _a,
+      'event': _a,
       'by': 'rules',
       'conversation': 'teams:c',
       'key': 'k',
@@ -156,7 +156,7 @@ void main() {
       (DecisionKind.admitted, {...good}..remove('by')),
       (DecisionKind.admitted, {...good, 'by': 'nick'}),
       (DecisionKind.admitted, {...good, 'by': null}),
-      (DecisionKind.admitted, {...good, 'arrival': 'nothex'}),
+      (DecisionKind.admitted, {...good, 'event': 'nothex'}),
       (DecisionKind.admitted, {...good, 'within': 'no-colon'}),
       (DecisionKind.admitted, {...good, 'from': null}),
       (DecisionKind.admitted, {...good, 'journey': _b}),
@@ -174,14 +174,14 @@ void main() {
       ),
       (
         DecisionKind.declined,
-        {'arrival': _a, 'by': 'rules', 'why': 'unread', 'key': 'k'},
+        {'event': _a, 'by': 'rules', 'why': 'unread', 'key': 'k'},
       ),
       (
         DecisionKind.declined,
-        {'arrival': _a, 'by': 'rules', 'why': 'never-heard-of-it'},
+        {'event': _a, 'by': 'rules', 'why': 'never-heard-of-it'},
       ),
-      (DecisionKind.declined, {'arrival': _a, 'why': 'unread'}),
-      (Kind.parse('arrived')!, {'arrival': _a, 'by': 'rules', 'why': 'unread'}),
+      (DecisionKind.declined, {'event': _a, 'why': 'unread'}),
+      (Kind.parse('arrived')!, {'event': _a, 'by': 'rules', 'why': 'unread'}),
     ];
     for (final (kind, json) in bad) {
       expect(decodeDecision(kind, bytes(json)), isNull, reason: '$json');

@@ -18,7 +18,7 @@ import 'reading.dart';
 /// [decision] as the entry the docking port sends: its kind, and its body.
 (Kind, Uint8List) encodeDecision(Decision decision) {
   final json = <String, Object?>{
-    'arrival': decision.arrival.hex,
+    'event': decision.event.hex,
     'by': decision.by.name,
   };
   switch (decision) {
@@ -90,26 +90,22 @@ Decision? decodeDecision(Kind kind, Uint8List body) {
     return null;
   }
   if (json is! Map<String, Object?>) return null;
-  final arrival = _read(json['arrival'], EntryHash.parse);
+  final event = _read(json['event'], EntryHash.parse);
   final by = _read(json['by'], _decidedBy);
-  if (arrival == null || by == null) return null;
-  if (kind == DecisionKind.admitted) return _admitted(arrival, by, json);
-  if (kind == DecisionKind.declined) return _declined(arrival, by, json);
+  if (event == null || by == null) return null;
+  if (kind == DecisionKind.admitted) return _admitted(event, by, json);
+  if (kind == DecisionKind.declined) return _declined(event, by, json);
   return null;
 }
 
 /// The [DecidedBy] named [name]; null for any other name.
 DecidedBy? _decidedBy(String name) => DecidedBy.values.asNameMap()[name];
 
-Admitted? _admitted(
-  EntryHash arrival,
-  DecidedBy by,
-  Map<String, Object?> json,
-) {
+Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
   final conversation = _read(json['conversation'], Conversation.parse);
-  final key = _read(json['key'], ArrivalKey.parse);
+  final key = _read(json['key'], EventKey.parse);
   if (conversation == null || key == null) return null;
-  final fields = {'arrival', 'by', 'conversation', 'key'};
+  final fields = {'event', 'by', 'conversation', 'key'};
 
   // An optional field: absent, or present and well formed.
   T? optional<T extends Object>(String name, T? Function(String) parse) {
@@ -146,7 +142,7 @@ Admitted? _admitted(
   }
   if (json.length != fields.length) return null;
   return Admitted(
-    arrival,
+    event,
     by: by,
     conversation: conversation,
     within: within,
@@ -172,28 +168,24 @@ JourneyPlacement? _readJourney(Map<String, Object?> json, Set<String> fields) {
   return const StartsJourney();
 }
 
-Declined? _declined(
-  EntryHash arrival,
-  DecidedBy by,
-  Map<String, Object?> json,
-) {
+Declined? _declined(EntryHash event, DecidedBy by, Map<String, Object?> json) {
   final why = json['why'];
   if (why is! String) return null;
   if (why == 'unread' || why == 'not-admissible') {
     if (json.length != 3) return null;
     return why == 'unread'
-        ? Unread(arrival, by: by)
-        : NotAdmissible(arrival, by: by);
+        ? Unread(event, by: by)
+        : NotAdmissible(event, by: by);
   }
   final conversation = _read(json['conversation'], Conversation.parse);
-  final key = _read(json['key'], ArrivalKey.parse);
+  final key = _read(json['key'], EventKey.parse);
   if (conversation == null || key == null) return null;
   switch (why) {
     case 'duplicate':
       final of = _read(json['of'], EntryHash.parse);
       if (of == null || json.length != 6) return null;
       return Duplicate(
-        arrival,
+        event,
         by: by,
         conversation: conversation,
         key: key,
@@ -203,7 +195,7 @@ Declined? _declined(
       final message = _read(json['message'], SourceMessageId.parse);
       if (message == null || json.length != 6) return null;
       return ChangesUnadmitted(
-        arrival,
+        event,
         by: by,
         conversation: conversation,
         key: key,
@@ -213,19 +205,19 @@ Declined? _declined(
       if (json.length != 5) return null;
       return switch (why) {
         'not-taken-in' => NotTakenIn(
-          arrival,
+          event,
           by: by,
           conversation: conversation,
           key: key,
         ),
         'not-a-turn' => NotATurn(
-          arrival,
+          event,
           by: by,
           conversation: conversation,
           key: key,
         ),
         _ => RespondsUnplaced(
-          arrival,
+          event,
           by: by,
           conversation: conversation,
           key: key,
