@@ -1,4 +1,4 @@
-/// What the docking port has decided, rebuilt from its own decisions
+/// What the docking station has decided, rebuilt from its own decisions
 /// alone, read back from the record in order (RULINGS: which conversation
 /// is under which journey path "is rebuilt by reading its own decisions
 /// back, not by working them out again").
@@ -14,14 +14,14 @@ import 'reading.dart';
 
 /// Every decision so far, as the questions deciding the next event asks.
 ///
-/// How it is used: the docking port follows the record's events and its
+/// How it is used: the docking station follows the record's events and its
 /// own `admitted` and `declined` entries from the record's start. It folds
 /// each event through its module's reading and [take]s each decision. At
 /// `caught-up` it decides, in order, each event that has no decision.
 /// Those are only ever the last few, because it records each decision
 /// before deciding the next. Then it decides each new event as it comes.
 /// Each decision is sent following [tip]. A refusal means another docking
-/// port decided first, and its decision comes on the record to be taken
+/// station decided first, and its decision comes on the record to be taken
 /// like any other.
 final class Decided {
   EntryHash? _tip;
@@ -63,7 +63,7 @@ final class Decided {
   /// Takes in [decision], recorded at [entry]. An [Admitted] that starts a
   /// journey path or a journey names it by [entry].
   ///
-  /// An entry already taken is ignored, so the docking port's own decision,
+  /// An entry already taken is ignored, so the docking station's own decision,
   /// taken when the record accepts it and read back later, can never move
   /// [tip] back.
   void take(EntryHash entry, Decision decision) {

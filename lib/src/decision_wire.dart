@@ -1,4 +1,4 @@
-/// A decision as the record entry the docking port sends, and back: the
+/// A decision as the record entry the docking station sends, and back: the
 /// JSON its class docs give, read strictly, since it is our own wire.
 library;
 
@@ -15,7 +15,7 @@ import 'package:is_shapes/is_shapes.dart'
 import 'decision.dart';
 import 'reading.dart';
 
-/// [decision] as the entry the docking port sends: its kind, and its body.
+/// [decision] as the entry the docking station sends: its kind, and its body.
 (Kind, Uint8List) encodeDecision(Decision decision) {
   final json = <String, Object?>{
     'event': decision.event.hex,
