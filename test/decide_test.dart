@@ -19,6 +19,13 @@ final class _All implements JourneyRule, TurnRule {
   bool startsTurn(MessageSaid said, AdmittedPlacement placement) => true;
 }
 
+/// Starts a turn only for something said that says `@agent`.
+final class _Mentions implements TurnRule {
+  @override
+  bool startsTurn(MessageSaid said, AdmittedPlacement placement) =>
+      said.node.text.contains('@agent');
+}
+
 EntryHash _hash(String s) => EntryHash.of(utf8.encode(s));
 
 void main() {
@@ -51,6 +58,48 @@ void main() {
     // A third copy is where naming the copy before shows: two copies name
     // the first either way.
     expect(ofs, [events[0], events[0], events[0]]);
+  });
+
+  test('something said that starts no turn is context under a path already '
+      'started, and never starts one', () {
+    final chat = ConversationId.parse('test:chat')!;
+    final decided = DecidedSoFar();
+    AdmissionDecision step(String key, String text) {
+      final decision = decide(
+        _hash(key),
+        MessageSaid(
+          conversation: chat,
+          within: null,
+          key: EventKey.parse(key)!,
+          node: UserSaid(
+            author: ActorId.parse('teams:t/p')!,
+            source: SourceMessageId.parse('chat|$key')!,
+            text: text,
+          ),
+        ),
+        decided,
+        journeys: _All(),
+        turns: _Mentions(),
+      );
+      decided.take(_hash('decision $key'), decision);
+      return decision;
+    }
+
+    expect(step('a', 'morning all'), isA<SaidStartsNoTurn>());
+    final started = step('b', '@agent hello') as EventAdmitted;
+    expect(started.placement, isA<StartsJourneyPath>());
+    expect(started.startsTurn, isTrue);
+    final context = step('c', 'lunch?') as EventAdmitted;
+    expect(
+      context.placement,
+      isA<UnderJourneyPath>().having(
+        (p) => p.journeyPath.hex,
+        'journeyPath',
+        _hash('decision b').hex,
+      ),
+    );
+    expect(context.startsTurn, isFalse);
+    expect(context.rules, isNull);
   });
 
   test('a path started in a journey already taken in records the rules '

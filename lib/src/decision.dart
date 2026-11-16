@@ -128,7 +128,7 @@ sealed class AdmissionDecision {
 /// The entry, of kind `admitted`:
 ///
 ///     {"event": <hex>, "by": <who>, "reading": <reading>,
-///      ...the placement, "rules": <rules>?}
+///      ...the placement, "rules": <rules>?, "startsTurn": <bool>?}
 ///
 /// `<reading>` is the whole reading, as [encodeReading] writes it (Nick,
 /// 16 Nov: the `admitted` entry carries the reading), so whatever hands the
@@ -145,18 +145,30 @@ sealed class AdmissionDecision {
 /// reads a path's rules from the entry that started it, and the airlock
 /// enforces them; the docking station passes them through unread.
 ///
+/// [startsTurn] is there exactly when the reading is [MessageSaid]: whether
+/// the agent answers it, as the [TurnRule] said. Something said that starts
+/// no turn is still admitted under its conversation's journey path, so the
+/// agent has it as context (Nick, 16 Nov: "yeah that sounds right", to
+/// admitting it rather than declining it). It never starts a journey path,
+/// since a path brings up an agent loop: one that starts no turn where its
+/// conversation has no path yet is [SaidStartsNoTurn].
+///
 /// The reading's [within] is kept so which journey an outside conversation
 /// is can be rebuilt from decisions alone; its [from], for rules about who
 /// starts turns, such as a cap on turns bots start.
 final class EventAdmitted extends AdmissionDecision {
   /// Throws an [ArgumentError] when [rules] are given for an admission
-  /// that starts nothing, or missing for one that starts something.
+  /// that starts nothing, or missing for one that starts something; when
+  /// [startsTurn] is given for anything but something said, or missing for
+  /// something said; and when something said starts a journey path but no
+  /// turn.
   EventAdmitted(
     super.event, {
     required super.by,
     required this.reading,
     required this.placement,
     this.rules,
+    this.startsTurn,
   }) {
     if ((rules != null) != starts(placement)) {
       throw ArgumentError.value(
@@ -165,11 +177,29 @@ final class EventAdmitted extends AdmissionDecision {
         'given exactly when the admission starts a journey or a path',
       );
     }
+    if ((startsTurn != null) != (reading is MessageSaid)) {
+      throw ArgumentError.value(
+        startsTurn,
+        'startsTurn',
+        'given exactly when the reading is something said',
+      );
+    }
+    if (placement is StartsJourneyPath && startsTurn == false) {
+      throw ArgumentError.value(
+        startsTurn,
+        'startsTurn',
+        'something said that starts no turn starts no journey path',
+      );
+    }
   }
 
   final AdmissibleEvent reading;
   final AdmittedPlacement placement;
   final JsonObject? rules;
+
+  /// Whether the agent answers it: for something said, and null for
+  /// anything else.
+  final bool? startsTurn;
 
   /// Whether [placement] starts a journey path or a journey.
   static bool starts(AdmittedPlacement placement) => switch (placement) {
@@ -276,7 +306,9 @@ final class ConversationNotTakenIn extends DeclinedKeyedEvent {
   });
 }
 
-/// Something said that the turn rule says starts no turn.
+/// Something said that the turn rule says starts no turn, in a conversation
+/// with no journey path yet. Where it has one, it is admitted, with
+/// [EventAdmitted.startsTurn] false.
 final class SaidStartsNoTurn extends DeclinedKeyedEvent {
   const SaidStartsNoTurn(
     super.event, {

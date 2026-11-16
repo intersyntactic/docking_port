@@ -76,6 +76,7 @@ EventAdmitted _admitted(AdmittedPlacement placement, DecidedBy by) =>
       reading: said,
       placement: placement,
       rules: EventAdmitted.starts(placement) ? rules : null,
+      startsTurn: true,
     );
 
 String _text((Kind, Uint8List) entry) => utf8.decode(entry.$2);
@@ -93,7 +94,7 @@ void main() {
       '"key":"message:1","node":{"shape":"UserSaid","author":"teams:t/p",'
       '"source":"19:x;messageid=1|1","text":"hi"}},'
       '"startsJourneyPath":true,"startsJourney":true,'
-      '"rules":{"tools":"all"}}',
+      '"rules":{"tools":"all"},"startsTurn":true}',
     );
   });
 
@@ -129,7 +130,15 @@ void main() {
             by: by,
             reading: reading,
             placement: UnderJourneyPath(path),
+            startsTurn: reading is MessageSaid ? true : null,
           ),
+        EventAdmitted(
+          event,
+          by: by,
+          reading: said,
+          placement: UnderJourneyPath(path),
+          startsTurn: false,
+        ),
         EventAdmitted(
           event,
           by: by,
@@ -197,9 +206,32 @@ void main() {
       'by': 'rules',
       'reading': reading,
       'journeyPath': _c,
+      'startsTurn': true,
     };
     expect(decodeDecision(DecisionEntryKind.admitted, bytes(good)), isNotNull);
+    expect(
+      decodeDecision(
+        DecisionEntryKind.admitted,
+        bytes({...good, 'startsTurn': false}),
+      ),
+      isNotNull,
+    );
+    final (joinKind, joinBody) = encodeDecision(
+      EventAdmitted(
+        event,
+        by: DecidedBy.rules,
+        reading: readings.whereType<ConversationJoined>().single,
+        placement: IntoJourney(InJourney(JourneyId.parse(_b)!)),
+      ),
+    );
+    final join = jsonDecode(utf8.decode(joinBody)) as Map<String, Object?>;
+    expect(decodeDecision(joinKind, bytes(join)), isNotNull);
     final bad = <(Kind, Map<String, Object?>)>[
+      // Something said must say whether it starts a turn, as a bool.
+      (DecisionEntryKind.admitted, {...good}..remove('startsTurn')),
+      (DecisionEntryKind.admitted, {...good, 'startsTurn': 'yes'}),
+      // Nothing but something said says it.
+      (joinKind, {...join, 'startsTurn': true}),
       (DecisionEntryKind.declined, good),
       (DecisionEntryKind.admitted, {...good, 'extra': 1}),
       (DecisionEntryKind.admitted, {...good}..remove('reading')),
@@ -342,6 +374,8 @@ void main() {
       {...starts}..remove('rules'),
       {...starts, 'rules': 'all'},
       {...starts, 'rules': null},
+      // Something said that starts no turn starts no journey path.
+      {...starts, 'startsTurn': false},
     ]) {
       expect(
         decodeDecision(DecisionEntryKind.admitted, bytes(json)),

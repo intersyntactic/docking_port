@@ -36,6 +36,9 @@ import 'reading_wire.dart';
           _journey(json, journey);
       }
       if (decision.rules case final rules?) json['rules'] = rules;
+      if (decision.startsTurn case final startsTurn?) {
+        json['startsTurn'] = startsTurn;
+      }
     case JourneyEnded(:final journey):
       json['journey'] = journey.hex;
     case EventDeclined():
@@ -147,14 +150,26 @@ EventAdmitted? _admitted(
     if (rules == null) return null;
     fields.add('rules');
   }
+  bool? startsTurn;
+  if (json.containsKey('startsTurn')) {
+    if (json['startsTurn'] case final bool value) {
+      startsTurn = value;
+    } else {
+      return null;
+    }
+    fields.add('startsTurn');
+  }
   if (json.length != fields.length) return null;
   if ((rules != null) != EventAdmitted.starts(placement)) return null;
+  if ((startsTurn != null) != (reading is MessageSaid)) return null;
+  if (placement is StartsJourneyPath && startsTurn == false) return null;
   return EventAdmitted(
     event,
     by: by,
     reading: reading,
     placement: placement,
     rules: rules,
+    startsTurn: startsTurn,
   );
 }
 
