@@ -202,6 +202,7 @@ EventAdmitted _startsChat(EntryHash event, String key) => EventAdmitted(
   ),
   placement: const StartsJourneyPath(StartsJourney()),
   rules: const JsonObject.of({'tools': 'all'}),
+  startsTurn: true,
 );
 
 void main() {

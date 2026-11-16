@@ -42,6 +42,8 @@ abstract interface class JourneyRule {
 /// path's terms, which the agent then takes its own turn in answer to.
 abstract interface class TurnRule {
   /// Whether [said] starts a turn under [placement]. When it doesn't, it
+  /// is admitted as context, with [EventAdmitted.startsTurn] false, under
+  /// a journey path already started; where it would have started one, it
   /// is [SaidStartsNoTurn], and nothing it would have started is started.
   bool startsTurn(MessageSaid said, AdmittedPlacement placement);
 }

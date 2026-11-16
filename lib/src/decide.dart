@@ -18,9 +18,10 @@ import 'rules.dart';
 /// In order: an event whose key was decided already is a [DuplicateEvent]. A
 /// change goes where the message it changes went, and a verdict under its
 /// conversation's journey path. A join goes into its journey, and
-/// something said under its conversation's journey path, or a new one
-/// that the turn rule lets it start. A journey not yet started is started
-/// only when [journeys] takes it in.
+/// something said under its conversation's journey path, marked with
+/// whether the turn rule says it starts a turn, or under a new one when it
+/// does. A journey not yet started is started only when [journeys] takes
+/// it in.
 ///
 /// Every decision it makes is [DecidedBy.rules]: nothing here asks the
 /// person.
@@ -52,14 +53,18 @@ AdmissionDecision decide(
     );
   }
 
-  EventAdmitted admit(AdmittedPlacement placement, [JsonObject? rules]) =>
-      EventAdmitted(
-        event,
-        by: by,
-        reading: admissible,
-        placement: placement,
-        rules: rules,
-      );
+  EventAdmitted admit(
+    AdmittedPlacement placement, {
+    JsonObject? rules,
+    bool? startsTurn,
+  }) => EventAdmitted(
+    event,
+    by: by,
+    reading: admissible,
+    placement: placement,
+    rules: rules,
+    startsTurn: startsTurn,
+  );
 
   switch (admissible) {
     case MessageChanged(:final message):
@@ -86,7 +91,10 @@ AdmissionDecision decide(
     case ConversationJoined():
       return switch (_journey(admissible, decided, journeys)) {
         (InJourney() && final journey, _) => admit(IntoJourney(journey)),
-        (final journey, final rules) => admit(IntoJourney(journey), rules),
+        (final journey, final rules) => admit(
+          IntoJourney(journey),
+          rules: rules,
+        ),
         null => ConversationNotTakenIn(
           event,
           by: by,
@@ -111,14 +119,19 @@ AdmissionDecision decide(
           key: key,
         );
       }
-      return turns.startsTurn(admissible, placement)
-          ? admit(placement, rules)
-          : SaidStartsNoTurn(
-              event,
-              by: by,
-              conversation: conversation,
-              key: key,
-            );
+      final startsTurn = turns.startsTurn(admissible, placement);
+      // Something said that starts no turn still goes under a path that
+      // has started, as context; it never starts one, since a path brings
+      // up an agent loop with nothing to answer.
+      if (!startsTurn && placement is StartsJourneyPath) {
+        return SaidStartsNoTurn(
+          event,
+          by: by,
+          conversation: conversation,
+          key: key,
+        );
+      }
+      return admit(placement, rules: rules, startsTurn: startsTurn);
   }
 }
 
