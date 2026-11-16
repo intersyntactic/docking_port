@@ -11,7 +11,7 @@ import 'decision.dart';
 import 'reading.dart';
 import 'rules.dart';
 
-/// What the docking port decides about the event recorded at [event], read
+/// What the docking station decides about the event recorded at [event], read
 /// by its module's reading as [reading], given everything [decided] so
 /// far. [reading] is null when no reading takes the event's source, or its
 /// body is not what a relay records.

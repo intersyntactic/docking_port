@@ -1,9 +1,9 @@
-name: is_docking_port
+name: is_docking_station
 description: >-
-  The docking port, a core piece of intersyntactic: it reads events from
+  The docking station, a core piece of intersyntactic: it reads events from
   the record in order and admits each one under a journey path (RULINGS).
 version: 0.0.1
-repository: https://github.com/intersyntactic/docking_port
+repository: https://github.com/intersyntactic/docking_station
 publish_to: none
 
 environment:

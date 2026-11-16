@@ -1,5 +1,5 @@
-/// Running the docking port: following the record, deciding each event,
-/// and sending each decision to it (RULINGS, "The docking port admits
+/// Running the docking station: following the record, deciding each event,
+/// and sending each decision to it (RULINGS, "The docking station admits
 /// events under journey paths").
 library;
 
@@ -23,7 +23,7 @@ import 'rules.dart';
 /// event, not an arrival").
 final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 
-/// Runs the docking port until [follow]'s stream ends, which it never
+/// Runs the docking station until [follow]'s stream ends, which it never
 /// should: the caller treats a return as the record going away.
 ///
 /// It follows the record from its start, asking [follow] for its events
@@ -35,14 +35,13 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 /// each event after that, as it comes.
 ///
 /// When the record refuses a decision, [tipOf] says whether the decisions'
-/// chain has moved on. If it has, another docking port decided first, and
+/// chain has moved on. If it has, another docking station decided first, and
 /// its decision comes on the record to be taken like any other. If it
-/// hasn't, the
-/// refusal is for some other reason, such as a sender table that doesn't
-/// allow the kind, and it is rethrown: deciding on regardless could admit
-/// an event twice. A decision in the record that can't be read back stops
-/// it too, for the same reason.
-Future<void> runDockingPort({
+/// hasn't, the refusal is for some other reason, such as a sender table
+/// that doesn't allow the kind, and it is rethrown: deciding on regardless
+/// could admit an event twice. A decision in the record that can't be read
+/// back stops it too, for the same reason.
+Future<void> runDockingStation({
   required Stream<FollowItem> Function(Set<Kind> kinds) follow,
   required Future<EntryHash> Function(
     Kind kind,
@@ -72,7 +71,7 @@ Future<void> runDockingPort({
   final waiting = <EntryHash, Reading?>{};
 
   // Decides each waiting event in order. Returns early when another
-  // docking port has decided first: its decisions come on the record.
+  // docking station has decided first: its decisions come on the record.
   Future<void> decideWaiting() async {
     while (waiting.isNotEmpty) {
       final MapEntry(key: event, value: reading) = waiting.entries.first;

@@ -6,7 +6,7 @@ import 'dart:typed_data';
 
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
-import 'package:is_docking_port/is_docking_port.dart';
+import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'

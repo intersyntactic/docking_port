@@ -1,5 +1,5 @@
-/// The docking port, a core piece of intersyntactic (RULINGS, "The docking
-/// port admits events under journey paths"): it reads events from the
+/// The docking station, a core piece of intersyntactic (RULINGS, "The docking
+/// station admits events under journey paths"): it reads events from the
 /// record in order and admits each one under a journey path, deciding which
 /// journey path an outside conversation belongs to, whether an event starts
 /// a turn, and that none is admitted twice.
@@ -10,7 +10,7 @@
 /// [encodeDecision] writes it and [decodeDecision] reads it back; [decide],
 /// which makes one under the rules passed in, [JourneyRule] and [TurnRule];
 /// [Decided], what the decisions add up to when read back; and
-/// [runDockingPort], which follows the record and sends each decision to
+/// [runDockingStation], which follows the record and sends each decision to
 /// it.
 ///
 /// Not here yet: handing an event to a journey path's apex.

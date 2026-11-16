@@ -1,36 +1,36 @@
-# is_docking_port
+# is_docking_station
 
-The docking port is the core piece that lets the outside world into journey
+The docking station is the core piece that lets the outside world into journey
 paths. Something outside, such as Teams, sends bytes unasked. Its relay keeps
-them in the record exactly as they came, as an *event*. The docking port
+them in the record exactly as they came, as an *event*. The docking station
 reads events from the record in order and decides, for each one, whether it
 comes in and where it goes.
 
 Each one is an entry of kind `event`. They were called arrivals until Nick
 renamed them on 16 Nov ("It's an event, not an arrival"), and entries
 written before then keep the kind `arrived` for good: an entry's kind is
-part of the bytes its hash is taken from. So the docking port reads both.
+part of the bytes its hash is taken from. So the docking station reads both.
 
 It is the airlock's opposite. The airlock decides what leaves a journey path
-for the world. The docking port decides what comes into one. On the way back,
-the docking port only says which conversation an answer goes to. Sending the
+for the world. The docking station decides what comes into one. On the way back,
+the docking station only says which conversation an answer goes to. Sending the
 answer is an effect, so the airlock decides that.
 
-The rules behind it are in intersyntactic's RULINGS ("The docking port admits
+The rules behind it are in intersyntactic's RULINGS ("The docking station admits
 events under journey paths"). This README is how it works.
 
 ## How a module takes part: it describes, and decides nothing
 
-A module, such as the Teams module, takes part only by giving the docking port
-a *reading* (`ModuleReading`). The docking port hands the reading every event
-from the module's relay, in the record's order. For each one, the reading
-says what it is. The docking port never reads a module's bytes itself, and
-the module never learns where anything went.
+A module, such as the Teams module, takes part only by giving the docking
+station a *reading* (`ModuleReading`). The docking station hands the reading
+every event from the module's relay, in the record's order. For each one,
+the reading says what it is. The docking station never reads a module's
+bytes itself, and the module never learns where anything went.
 
-A reading is a fold. It keeps state of its own, which the docking port never
+A reading is a fold. It keeps state of its own, which the docking station never
 looks inside, because some events can only be read with what came before. A
 quoted message's author is known from earlier events, and an edit has to be
-matched to the message it edits. On every start the docking port folds again
+matched to the message it edits. On every start the docking station folds again
 from the record's beginning, so a reading must give the same answer for the
 same events in the same order.
 
@@ -43,7 +43,7 @@ For each event, the reading names:
   name two conversations alike.
 - **what that conversation sits within**, such as the channel a thread is in,
   or nothing, for a chat or for a channel itself. This is how threads are
-  grouped (below), without the docking port ever reading a module's ids.
+  grouped (below), without the docking station ever reading a module's ids.
 - **who it comes from**, as an `ActorId`, or no one.
 - **its event key**: what "never admitted twice" compares. A relay can record
   one thing twice (Teams resends when it doesn't hear back in time), and both
@@ -69,7 +69,7 @@ For each event, the reading names:
   `UserSaidChanged`, because that node points at the turn the message became,
   and only the loop knows that turn. A module never learns turns. A change
   counts only when it comes from whoever said the message (Nick, 16 Nov), and
-  whatever reads it applies that, so the docking port admits it whoever made
+  whatever reads it applies that, so the docking station admits it whoever made
   it.
 - **Joined** (`Joined`): people or the agent joined a conversation. Never
   empty: a join of no one is nothing to admit.
@@ -86,7 +86,7 @@ For each event, the reading names:
   module doesn't carry, anything it can't read.
 
 Whether something said starts a turn is not the reading's call. The docking
-port decides that, under the journey path's rules.
+station decides that, under the journey path's rules.
 
 ## Journeys and journey paths
 
@@ -115,9 +115,9 @@ uses the same one.
   cases, `Conversation`, `EventKey`.
 - **Proposed, not agreed:** admission, meaning the decision recorded for each
   event, the rules passed in, and rebuilding from the record
-  (https://github.com/intersyntactic/docking_port/pull/2,
-  https://github.com/intersyntactic/docking_port/pull/3); who made each
-  decision (https://github.com/intersyntactic/docking_port/pull/5); following
+  (https://github.com/intersyntactic/docking_station/pull/2,
+  https://github.com/intersyntactic/docking_station/pull/3); who made each
+  decision (https://github.com/intersyntactic/docking_station/pull/5); following
   the record and sending each decision
-  (https://github.com/intersyntactic/docking_port/pull/6).
+  (https://github.com/intersyntactic/docking_station/pull/6).
 - **Coming:** handing admitted events to a journey path's agent loop.

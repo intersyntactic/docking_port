@@ -1,4 +1,4 @@
-// What the docking port sends a record, and when: against a record kept in
+// What the docking station sends a record, and when: against a record kept in
 // memory the way the journal service keeps one.
 import 'dart:async';
 import 'dart:convert';
@@ -8,7 +8,7 @@ import 'package:agent_loop/agent_loop.dart'
     show CaughtUp, FollowItem, JournalEntryFrame, JournalWriteRefused;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
-import 'package:is_docking_port/is_docking_port.dart';
+import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy;
@@ -48,8 +48,8 @@ final class _Record {
   JournalEntryFrame add(String kind, EntryHash? follows, List<int> body) {
     final header = utf8.encode('$kind\n${follows?.hex ?? '-'}\n');
     final bytes = Uint8List.fromList([...header, ...body]);
-    // A kind made from its name, never one of the docking port's own, so
-    // the docking port has to compare kinds by value.
+    // A kind made from its name, never one of the docking station's own, so
+    // the docking station has to compare kinds by value.
     final frame = JournalEntryFrame(
       hash: EntryHash.of(bytes),
       kind: Kind.parse(kind)!,
@@ -81,7 +81,7 @@ final class _Record {
     ),
   );
 
-  /// [decision], sent by another docking port, following the tip.
+  /// [decision], sent by another docking station, following the tip.
   void decideElsewhere(Decision decision) {
     final (kind, body) = encodeDecision(decision);
     _tip = add(kind.name, _tip, body).hash;
@@ -167,7 +167,7 @@ final class _EverySaid implements TurnRule {
   bool startsTurn(Said said, Placement placement) => true;
 }
 
-Future<void> _run(_Record record, _Reading reading) => runDockingPort(
+Future<void> _run(_Record record, _Reading reading) => runDockingStation(
   follow: record.follow,
   send: record.send,
   tipOf: record.tipOf,
@@ -176,7 +176,7 @@ Future<void> _run(_Record record, _Reading reading) => runDockingPort(
   turns: const _EverySaid(),
 );
 
-/// Runs the docking port on [record] until it has done all it can, then
+/// Runs the docking station on [record] until it has done all it can, then
 /// ends the record and waits for it to finish.
 Future<void> _runToEnd(_Record record, _Reading reading) async {
   final running = _run(record, reading);
@@ -261,7 +261,7 @@ void main() {
     expect(record.decisions.map((d) => d.event), [c.hash]);
   });
 
-  test('when another docking port decided first, takes its decision and '
+  test('when another docking station decided first, takes its decision and '
       'sends nothing more', () async {
     final record = _Record();
     final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
@@ -287,7 +287,7 @@ void main() {
     final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
     record.decideElsewhere(_startsChat(a0.hash, 'a0'));
     record.recordEvent({'said': 'again', 'key': 'a'});
-    record.refuse = 'docking-port may not send admitted';
+    record.refuse = 'docking-station may not send admitted';
 
     await expectLater(
       _run(record, _Reading()),

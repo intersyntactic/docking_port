@@ -1,4 +1,4 @@
-/// The rules the docking port decides by, passed in: whether an outside
+/// The rules the docking station decides by, passed in: whether an outside
 /// conversation comes in at all, and whether something said starts a turn.
 /// Both are calls still open, so neither is written here.
 ///

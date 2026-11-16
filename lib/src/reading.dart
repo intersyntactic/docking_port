@@ -1,11 +1,11 @@
-/// The reading contract: what a module gives the docking port, and all it
+/// The reading contract: what a module gives the docking station, and all it
 /// gives.
 ///
-/// A module takes part only by describing (RULINGS, "The docking port admits
-/// events under journey paths"). The docking port hands its
+/// A module takes part only by describing (RULINGS, "The docking station admits
+/// events under journey paths"). The docking station hands its
 /// [ModuleReading] every event from the module's relay, in the record's
 /// order, and for each the reading says what it is: a [Reading]. The
-/// docking port never reads a module's bytes itself, and the module never
+/// docking station never reads a module's bytes itself, and the module never
 /// learns which journey path anything went to.
 library;
 
@@ -18,7 +18,7 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
 
-/// One event, as the docking port gives it to a reading: its entry's hash,
+/// One event, as the docking station gives it to a reading: its entry's hash,
 /// and what its relay recorded, `{"at", "source", "bytes"}`, as an entry of
 /// kind `event`, or `arrived` if it was recorded before the rename (Nick,
 /// 16 Nov: "It's an event, not an arrival").
@@ -75,14 +75,14 @@ final class Event {
   }
 }
 
-/// A module's reading of its relay's events, as a fold: the docking port
+/// A module's reading of its relay's events, as a fold: the docking station
 /// starts from [start] and calls [step] with each event from [source], in
 /// the record's order, keeping only the state it returns.
 ///
-/// [S] is the module's own, and the docking port never looks inside it. It
+/// [S] is the module's own, and the docking station never looks inside it. It
 /// is there for what a reading needs from earlier events: a quote's
 /// author, the message an edit or delete is of, who an earlier join brought
-/// in. On every start the docking port folds again from the record's
+/// in. On every start the docking station folds again from the record's
 /// beginning, already-admitted events included, so [step] must give the
 /// same answer for the same events in the same order, and must not change
 /// the state it is given.
@@ -111,7 +111,7 @@ final class NothingToAdmit extends Reading {
   const NothingToAdmit();
 }
 
-/// An event the docking port may admit, and what it needs to decide
+/// An event the docking station may admit, and what it needs to decide
 /// whether to.
 sealed class Admissible extends Reading {
   const Admissible({
@@ -130,7 +130,7 @@ sealed class Admissible extends Reading {
   /// It is what the outside groups its conversations by: a channel is a
   /// journey and each of its threads a journey path (Nick, 2026-11-15:
   /// "channel = journey, thread = journey path"). The reading names it so
-  /// the docking port never reads a module's ids to find it.
+  /// the docking station never reads a module's ids to find it.
   final Conversation? within;
 
   /// Who it comes from, or null for no one the module can name.
@@ -143,7 +143,7 @@ sealed class Admissible extends Reading {
 }
 
 /// Something said, as [node], the node the journey path's apex appends.
-/// Whether it starts a turn is the docking port's decision, under the
+/// Whether it starts a turn is the docking station's decision, under the
 /// journey path's rules.
 ///
 /// The reading builds [node] because only its fold holds what that takes,
@@ -261,7 +261,7 @@ final class Responded extends Admissible {
 }
 
 /// An outside conversation: a Teams chat, channel or channel thread, a
-/// Slack channel. The docking port keeps each one under a journey path,
+/// Slack channel. The docking station keeps each one under a journey path,
 /// and one that others sit inside, such as a channel, as a journey.
 ///
 /// Written like an [ActorId], a source, a colon and the rest, such as
