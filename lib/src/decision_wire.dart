@@ -75,7 +75,7 @@ String _why(Declined declined) => switch (declined) {
   Duplicate() => 'duplicate',
   NotTakenIn() => 'not-taken-in',
   NotATurn() => 'not-a-turn',
-  RespondsUnplaced() => 'responds-unplaced',
+  JudgedUnplaced() => 'judged-unplaced',
   ChangesUnadmitted() => 'changes-unadmitted',
 };
 
@@ -201,7 +201,7 @@ Declined? _declined(EntryHash event, DecidedBy by, Map<String, Object?> json) {
         key: key,
         message: message,
       );
-    case 'not-taken-in' || 'not-a-turn' || 'responds-unplaced':
+    case 'not-taken-in' || 'not-a-turn' || 'judged-unplaced':
       if (json.length != 5) return null;
       return switch (why) {
         'not-taken-in' => NotTakenIn(
@@ -216,7 +216,7 @@ Declined? _declined(EntryHash event, DecidedBy by, Map<String, Object?> json) {
           conversation: conversation,
           key: key,
         ),
-        _ => RespondsUnplaced(
+        _ => JudgedUnplaced(
           event,
           by: by,
           conversation: conversation,

@@ -6,8 +6,8 @@
 /// path of its own, in the journey of what it sits within, or its own
 /// journey when it sits within nothing (Nick, 2026-11-15: "channel =
 /// journey, thread = journey path"). A change goes where the message it
-/// changes went; a response goes under its conversation's journey path,
-/// since what it responds to was shown there.
+/// changes went; a verdict goes under its conversation's journey path,
+/// since what it judges was shown there.
 ///
 /// A rule is asked at most once per event, in the record's order, and what
 /// it answered is kept in the decision, never asked again on a restart. So

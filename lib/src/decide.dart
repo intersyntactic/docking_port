@@ -17,7 +17,7 @@ import 'rules.dart';
 /// body is not what a relay records.
 ///
 /// In order: an event whose key was decided already is a [Duplicate]. A
-/// change goes where the message it changes went, and a response under its
+/// change goes where the message it changes went, and a verdict under its
 /// conversation's journey path. A join goes into its journey, and
 /// something said under its conversation's journey path, or a new one
 /// that the turn rule lets it start. A journey not yet started is started
@@ -76,10 +76,10 @@ Decision decide(
           message: message,
         ),
       };
-    case Responded(:final to):
+    case Judged(:final to):
       return switch (decided.journeyPathOf(conversation)) {
         final path? => admit(Under(path), message: to),
-        null => RespondsUnplaced(
+        null => JudgedUnplaced(
           event,
           by: by,
           conversation: conversation,

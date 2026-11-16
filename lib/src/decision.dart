@@ -148,7 +148,7 @@ final class Admitted extends Decision {
   final EventKey key;
   final ActorId? from;
 
-  /// The message it says, changes or responds to; null for a join.
+  /// The message it says, changes or judges; null for a join.
   final SourceMessageId? message;
 
   final Placement placement;
@@ -162,7 +162,7 @@ final class Admitted extends Decision {
 ///     {"event": <hex>, "by": <who>, "why": <case>, ...the case's own fields}
 ///
 /// `<case>` is `unread`, `not-admissible`, `duplicate`, `not-taken-in`,
-/// `not-a-turn`, `responds-unplaced` or `changes-unadmitted`.
+/// `not-a-turn`, `judged-unplaced` or `changes-unadmitted`.
 sealed class Declined extends Decision {
   const Declined(super.event, {required super.by});
 }
@@ -230,10 +230,10 @@ final class NotATurn extends DeclinedEvent {
   });
 }
 
-/// A response in [conversation], which is under no journey path, so no turn
-/// of the agent's there could have shown what was responded to.
-final class RespondsUnplaced extends DeclinedEvent {
-  const RespondsUnplaced(
+/// A verdict in [conversation], which is under no journey path, so no turn
+/// of the agent's there could have shown what was judged.
+final class JudgedUnplaced extends DeclinedEvent {
+  const JudgedUnplaced(
     super.event, {
     required super.by,
     required super.conversation,

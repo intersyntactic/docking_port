@@ -73,15 +73,15 @@ For each event, the reading names:
   it.
 - **Joined** (`Joined`): people or the agent joined a conversation. Never
   empty: a join of no one is nothing to admit.
-- **Responded** (`Responded`): a person's response to something the agent
-  showed them, such as Approve, Not yet or a proposed correction on a card.
-  It is named for what it says, not for the button: a Slack button would be
-  the same thing. It names the message responded to, and the response as
-  is_annotation_shapes' `Response`: `Approved`, `HeldOff` or `Proposed`. As
+- **Judged** (`Judged`): a person's verdict on something the agent showed
+  them, such as Approve, Not yet or a proposed correction on a card. It is
+  named for what it says, not for the button: a Slack button would be the
+  same thing. It names the message judged, and the verdict as
+  is_annotation_shapes' `Verdict`: `Approved`, `HeldOff` or `Proposed`. As
   with a change, the journey path's agent loop builds the annotation (an
   `Approval`, a `Seen`, a `Correction`) once it knows which turn the message
-  showed. A response always names who responded, since a response from no
-  one approves nothing.
+  showed. A verdict always names who gave it, since a verdict from no one
+  approves nothing.
 - **Nothing to admit** (`NothingToAdmit`): a typing indicator, a reaction the
   module doesn't carry, anything it can't read.
 

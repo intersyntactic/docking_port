@@ -119,7 +119,7 @@ void main() {
         ),
         NotTakenIn(event, by: by, conversation: conversation, key: key),
         NotATurn(event, by: by, conversation: conversation, key: key),
-        RespondsUnplaced(event, by: by, conversation: conversation, key: key),
+        JudgedUnplaced(event, by: by, conversation: conversation, key: key),
         ChangesUnadmitted(
           event,
           by: by,
