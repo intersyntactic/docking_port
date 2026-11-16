@@ -19,8 +19,8 @@ import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
 
 /// One event, as the docking port gives it to a reading: its entry's hash,
-/// and what its relay recorded, `{"at", "source", "bytes"}`. The record
-/// names these entries `arrived` until its writer takes a new name (Nick,
+/// and what its relay recorded, `{"at", "source", "bytes"}`, as an entry of
+/// kind `event`, or `arrived` if it was recorded before the rename (Nick,
 /// 16 Nov: "It's an event, not an arrival").
 ///
 /// Only [Event.read] makes one, from the entry's body as recorded.

@@ -181,7 +181,7 @@ void main() {
         {'event': _a, 'by': 'rules', 'why': 'never-heard-of-it'},
       ),
       (DecisionKind.declined, {'event': _a, 'why': 'unread'}),
-      (Kind.parse('arrived')!, {'event': _a, 'by': 'rules', 'why': 'unread'}),
+      (Kind.parse('event')!, {'event': _a, 'by': 'rules', 'why': 'unread'}),
     ];
     for (final (kind, json) in bad) {
       expect(decodeDecision(kind, bytes(json)), isNull, reason: '$json');

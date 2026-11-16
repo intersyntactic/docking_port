@@ -63,13 +63,14 @@ final class _Record {
     return frame;
   }
 
-  /// An event from [source], whose bytes are [what] as JSON, recorded as
-  /// the record names events today: `arrived`.
+  /// An event from [source], whose bytes are [what] as JSON, recorded as an
+  /// entry of [kind].
   JournalEntryFrame recordEvent(
     Map<String, Object?> what, {
     String source = 'test',
+    String kind = 'event',
   }) => add(
-    'arrived',
+    kind,
     null,
     utf8.encode(
       jsonEncode({
@@ -317,5 +318,19 @@ void main() {
     expect(decision, isA<Unread>());
     expect(decision.event, x.hash);
     expect(reading.given, isEmpty);
+  });
+
+  test('reads an event recorded before the rename, as `arrived`', () async {
+    final record = _Record();
+    final reading = _Reading();
+    final old = record.recordEvent({
+      'said': 'hello',
+      'key': 'a',
+    }, kind: 'arrived');
+    final now = record.recordEvent({'said': 'again', 'key': 'b'});
+    await _runToEnd(record, reading);
+
+    expect(reading.given, [old.hash, now.hash]);
+    expect(record.decisions.map((d) => d.event), [old.hash, now.hash]);
   });
 }

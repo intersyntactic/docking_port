@@ -6,10 +6,10 @@ them in the record exactly as they came, as an *event*. The docking port
 reads events from the record in order and decides, for each one, whether it
 comes in and where it goes.
 
-The record still names these entries `arrived`. They were called arrivals
-until Nick renamed them on 16 Nov ("It's an event, not an arrival"), and the
-record's writer takes the new name at a cutover, while entries already
-written keep the old one. So the docking port reads both.
+Each one is an entry of kind `event`. They were called arrivals until Nick
+renamed them on 16 Nov ("It's an event, not an arrival"), and entries
+written before then keep the kind `arrived` for good: an entry's kind is
+part of the bytes its hash is taken from. So the docking port reads both.
 
 It is the airlock's opposite. The airlock decides what leaves a journey path
 for the world. The docking port decides what comes into one. On the way back,

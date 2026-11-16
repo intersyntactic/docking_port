@@ -17,11 +17,11 @@ import 'decision_wire.dart';
 import 'reading.dart';
 import 'rules.dart';
 
-/// The kinds of entry the record names events by: `arrived`, until its
-/// writer takes a new name. Entries recorded before then keep the old one,
-/// so a new name joins this set rather than replacing it (Nick, 16 Nov:
-/// "It's an event, not an arrival", renamed by each owner).
-final _eventKinds = {Kind.parse('arrived')!};
+/// The kinds of entry the record names events by: `event`, and `arrived`,
+/// which entries recorded before the rename keep for good, since an entry's
+/// kind is part of the bytes its hash is taken from (Nick, 16 Nov: "It's an
+/// event, not an arrival").
+final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 
 /// Runs the docking port until [follow]'s stream ends, which it never
 /// should: the caller treats a return as the record going away.
