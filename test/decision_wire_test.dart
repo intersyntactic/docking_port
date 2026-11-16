@@ -4,7 +4,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:is_annotation_shapes/is_annotation_shapes.dart' show Proposed;
+import 'package:is_annotation_shapes/is_annotation_shapes.dart'
+    show ProposedCorrectionVerdict;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show Deleted, Edited, SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
@@ -61,7 +62,7 @@ final readings = <Admissible>[
     from: from,
     key: key,
     to: message,
-    verdict: Proposed({'note': 'not yet'}),
+    verdict: ProposedCorrectionVerdict({'note': 'not yet'}),
   ),
 ];
 
@@ -243,7 +244,7 @@ void main() {
             'conversation': 'teams:c',
             'key': 'k',
             'to': 'c|1',
-            'verdict': {'shape': 'Approved'},
+            'verdict': {'shape': 'ApprovedVerdict'},
           },
         },
       ),

@@ -12,7 +12,8 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:is_annotation_shapes/is_annotation_shapes.dart' show Verdict;
+import 'package:is_annotation_shapes/is_annotation_shapes.dart'
+    show VerdictOnShownMessage;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid, WhatChanged;
 import 'package:is_journal/is_journal.dart' show EntryHash;
@@ -238,8 +239,8 @@ final class Joined extends Admissible {
 /// button, so a Slack button reads the same.
 ///
 /// It names the message, never a turn: the journey path's apex builds the
-/// annotation, an `Approval`, a `Seen` or a `Correction`, once it knows
-/// which turn [to] showed. A verdict always names who gave it, since a
+/// annotation, a `NodeApproval`, a `NodeSeenMark` or a `NodeCorrection`,
+/// once it knows which turn [to] showed. A verdict always names who gave it, since a
 /// verdict from no one approves nothing.
 final class Judged extends Admissible {
   const Judged({
@@ -257,7 +258,7 @@ final class Judged extends Admissible {
   /// The message judged, such as the card, as it was sent.
   final SourceMessageId to;
 
-  final Verdict verdict;
+  final VerdictOnShownMessage verdict;
 }
 
 /// An outside conversation: a Teams chat, channel or channel thread, a

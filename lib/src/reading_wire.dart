@@ -8,7 +8,8 @@
 library;
 
 import 'package:checked_json/checked_json.dart';
-import 'package:is_annotation_shapes/is_annotation_shapes.dart' show Verdict;
+import 'package:is_annotation_shapes/is_annotation_shapes.dart'
+    show VerdictOnShownMessage;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid, WhatChanged;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
@@ -22,7 +23,7 @@ import 'reading.dart';
 const readingNodeShapes = <String, Set<String>>{
   'node': {UserSaid.shapeName},
   'change': WhatChanged.shapeNames,
-  'verdict': Verdict.shapeNames,
+  'verdict': VerdictOnShownMessage.shapeNames,
 };
 
 /// [reading] as JSON:
@@ -33,7 +34,7 @@ const readingNodeShapes = <String, Set<String>>{
 /// `<case>` and its fields are `said`, with `"node"`, a [UserSaid];
 /// `changed`, with `"from"?`, `"message"` and `"change"`, a [WhatChanged];
 /// `joined`, with `"from"?` and `"joiners"`; `judged`, with `"from"`,
-/// `"to"` and `"verdict"`, a [Verdict].
+/// `"to"` and `"verdict"`, a [VerdictOnShownMessage].
 JsonObject encodeReading(Admissible reading) => JsonObject.of({
   'case': _case(reading),
   'conversation': reading.conversation.value,
@@ -120,7 +121,7 @@ Admissible decodeReading(JsonObject json) {
         from: _parse(json, 'from', ActorId.parse),
         key: key,
         to: _parse(json, 'to', SourceMessageId.parse),
-        verdict: Verdict.fromJson(json.object('verdict')),
+        verdict: VerdictOnShownMessage.fromJson(json.object('verdict')),
       ),
       const {'from', 'to', 'verdict'},
     ),

@@ -77,9 +77,10 @@ For each event, the reading names:
   them, such as Approve, Not yet or a proposed correction on a card. It is
   named for what it says, not for the button: a Slack button would be the
   same thing. It names the message judged, and the verdict as
-  is_annotation_shapes' `Verdict`: `Approved`, `HeldOff` or `Proposed`. As
-  with a change, the journey path's agent loop builds the annotation (an
-  `Approval`, a `Seen`, a `Correction`) once it knows which turn the message
+  is_annotation_shapes' `VerdictOnShownMessage`: `ApprovedVerdict`,
+  `HeldOffVerdict` or `ProposedCorrectionVerdict`. As with a change, the
+  journey path's agent loop builds the annotation (a `NodeApproval`, a
+  `NodeSeenMark`, a `NodeCorrection`) once it knows which turn the message
   showed. A verdict always names who gave it, since a verdict from no one
   approves nothing.
 - **Nothing to admit** (`NothingToAdmit`): a typing indicator, a reaction the
