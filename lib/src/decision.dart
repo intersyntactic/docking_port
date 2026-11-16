@@ -136,7 +136,7 @@ final class Admitted extends Decision {
   final ArrivalKey key;
   final ActorId? from;
 
-  /// The message it says or changes; null for a join.
+  /// The message it says, changes or responds to; null for a join.
   final SourceMessageId? message;
 
   final Placement placement;
