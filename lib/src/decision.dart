@@ -2,8 +2,8 @@
 /// as an entry of its own (RULINGS, "The docking station admits events under
 /// journey paths").
 ///
-/// Every event is decided exactly once: [Admitted] under a journey path,
-/// or [Declined], saying why. A decline is recorded as well as an
+/// Every event is decided exactly once: [EventAdmitted] under a journey path,
+/// or [EventDeclined], saying why. A decline is recorded as well as an
 /// admission, so on a restart the docking station reads back what it decided
 /// rather than deciding again. An event with no decision is one it had
 /// not reached, never one it turned away, so a reading or a rule changed
@@ -38,14 +38,14 @@ import 'rules.dart';
 
 /// The kinds of entry the docking station sends, one per event. Its user's
 /// row in the record's sender table allows these three and nothing else.
-abstract final class DecisionKind {
-  /// An [Admitted]'s kind.
+abstract final class DecisionEntryKind {
+  /// An [EventAdmitted]'s kind.
   static final admitted = Kind.parse('admitted')!;
 
-  /// A [Declined]'s kind.
+  /// A [EventDeclined]'s kind.
   static final declined = Kind.parse('declined')!;
 
-  /// An [Ended]'s kind.
+  /// An [JourneyEnded]'s kind.
   static final ended = Kind.parse('ended')!;
 
   /// Every kind above, as the docking station follows its own decisions.
@@ -53,16 +53,17 @@ abstract final class DecisionKind {
 }
 
 /// Where an admitted event goes. Something said, or a change, goes
-/// [Under] a journey path already started, or [StartsJourneyPath], a new
-/// one its admission starts. A join goes [IntoJourney]: it says who is in
-/// a journey, and is under none of its journey paths.
-sealed class Placement {
-  const Placement();
+/// [UnderJourneyPath] a journey path already started, or
+/// [StartsJourneyPath], a new one its admission starts. A join goes
+/// [IntoJourney]: it says who is in a journey, and is under none of its
+/// journey paths.
+sealed class AdmittedPlacement {
+  const AdmittedPlacement();
 }
 
 /// Under [journeyPath], in the journey it was started in.
-final class Under extends Placement {
-  const Under(this.journeyPath);
+final class UnderJourneyPath extends AdmittedPlacement {
+  const UnderJourneyPath(this.journeyPath);
 
   final JourneyPathId journeyPath;
 }
@@ -72,14 +73,14 @@ final class Under extends Placement {
 /// it. A [JourneyPathId] is given by whoever starts the journey path, and
 /// here that is the docking station, so the entry that started it is its one
 /// name, the way a turn's id is the hash of its entry.
-final class StartsJourneyPath extends Placement {
+final class StartsJourneyPath extends AdmittedPlacement {
   const StartsJourneyPath(this.journey);
 
   final JourneyPlacement journey;
 }
 
 /// Into [journey]: a join, which is about who is in it.
-final class IntoJourney extends Placement {
+final class IntoJourney extends AdmittedPlacement {
   const IntoJourney(this.journey);
 
   final JourneyPlacement journey;
@@ -112,8 +113,8 @@ final class StartsJourney extends JourneyPlacement {
 ///
 /// Every entry says who, as `"by": <who>`, where `<who>` is `rules` or
 /// `person`.
-sealed class Decision {
-  const Decision(this.event, {required this.by});
+sealed class AdmissionDecision {
+  const AdmissionDecision(this.event, {required this.by});
 
   /// The event decided, by its entry's hash.
   final EntryHash event;
@@ -133,7 +134,7 @@ sealed class Decision {
 /// 16 Nov: the `admitted` entry carries the reading), so whatever hands the
 /// event to its journey path's apex reads the node from the decision, and
 /// never reads a module's bytes. The placement is `"journeyPath": <id>` for
-/// [Under]; `"startsJourneyPath": true` and the journey for
+/// [UnderJourneyPath]; `"startsJourneyPath": true` and the journey for
 /// [StartsJourneyPath]; the journey alone for [IntoJourney]. The journey is
 /// `"journey": <id>` for [InJourney], or `"startsJourney": true` for
 /// [StartsJourney].
@@ -147,10 +148,10 @@ sealed class Decision {
 /// The reading's [within] is kept so which journey an outside conversation
 /// is can be rebuilt from decisions alone; its [from], for rules about who
 /// starts turns, such as a cap on turns bots start.
-final class Admitted extends Decision {
+final class EventAdmitted extends AdmissionDecision {
   /// Throws an [ArgumentError] when [rules] are given for an admission
   /// that starts nothing, or missing for one that starts something.
-  Admitted(
+  EventAdmitted(
     super.event, {
     required super.by,
     required this.reading,
@@ -166,26 +167,26 @@ final class Admitted extends Decision {
     }
   }
 
-  final Admissible reading;
-  final Placement placement;
+  final AdmissibleEvent reading;
+  final AdmittedPlacement placement;
   final JsonObject? rules;
 
   /// Whether [placement] starts a journey path or a journey.
-  static bool starts(Placement placement) => switch (placement) {
+  static bool starts(AdmittedPlacement placement) => switch (placement) {
     StartsJourneyPath() || IntoJourney(journey: StartsJourney()) => true,
-    Under() || IntoJourney(journey: InJourney()) => false,
+    UnderJourneyPath() || IntoJourney(journey: InJourney()) => false,
   };
 
-  Conversation get conversation => reading.conversation;
-  Conversation? get within => reading.within;
+  ConversationId get conversation => reading.conversation;
+  ConversationId? get within => reading.within;
   EventKey get key => reading.key;
   ActorId? get from => reading.from;
 
   /// The message it says, changes or judges; null for a join.
   SourceMessageId? get message => switch (reading) {
-    Said(:final message) || Changed(:final message) => message,
-    Judged(:final to) => to,
-    Joined() => null,
+    MessageSaid(:final message) || MessageChanged(:final message) => message,
+    ShownMessageJudged(:final to) => to,
+    ConversationJoined() => null,
   };
 }
 
@@ -202,8 +203,8 @@ final class Admitted extends Decision {
 /// The entry, of kind `ended`:
 ///
 ///     {"event": <hex>, "by": <who>, "journey": <id>}
-final class Ended extends Decision {
-  const Ended(super.event, {required super.by, required this.journey});
+final class JourneyEnded extends AdmissionDecision {
+  const JourneyEnded(super.event, {required super.by, required this.journey});
 
   final JourneyId journey;
 }
@@ -215,44 +216,45 @@ final class Ended extends Decision {
 ///
 ///     {"event": <hex>, "by": <who>, "why": <case>, ...the case's own fields}
 ///
-/// `<case>` is `unread`, `not-admissible`, `duplicate`, `not-taken-in`,
-/// `not-a-turn`, `judged-unplaced` or `changes-unadmitted`.
-sealed class Declined extends Decision {
-  const Declined(super.event, {required super.by});
+/// `<case>` is `no-reading-for-source`, `reading-found-nothing`,
+/// `duplicate-event`, `conversation-not-taken-in`, `said-starts-no-turn`,
+/// `shown-message-judged-unplaced` or `change-to-unadmitted-message`.
+sealed class EventDeclined extends AdmissionDecision {
+  const EventDeclined(super.event, {required super.by});
 }
 
 /// No reading takes the event's source, or its body is not what a relay
 /// records. A source whose module has no reading yet has its events
 /// declined, so a reading added later starts from the events after it.
-final class Unread extends Declined {
-  const Unread(super.event, {required super.by});
+final class NoReadingForSource extends EventDeclined {
+  const NoReadingForSource(super.event, {required super.by});
 }
 
 /// The module's reading found nothing to admit.
-final class NotAdmissible extends Declined {
-  const NotAdmissible(super.event, {required super.by});
+final class ReadingFoundNothing extends EventDeclined {
+  const ReadingFoundNothing(super.event, {required super.by});
 }
 
 /// An event a reading named by its key, declined. A key is decided once,
 /// whichever way it went, so a second event with the same key is a
-/// [Duplicate], even when the first was declined.
-sealed class DeclinedEvent extends Declined {
-  const DeclinedEvent(
+/// [DuplicateEvent], even when the first was declined.
+sealed class DeclinedKeyedEvent extends EventDeclined {
+  const DeclinedKeyedEvent(
     super.event, {
     required super.by,
     required this.conversation,
     required this.key,
   });
 
-  final Conversation conversation;
+  final ConversationId conversation;
   final EventKey key;
 }
 
 /// [key] in [conversation] was decided already, at the event [of]: its
 /// relay recorded one thing twice, as two events with one key.
 /// `"of": <hex>`.
-final class Duplicate extends DeclinedEvent {
-  const Duplicate(
+final class DuplicateEvent extends DeclinedKeyedEvent {
+  const DuplicateEvent(
     super.event, {
     required super.by,
     required super.conversation,
@@ -265,8 +267,8 @@ final class Duplicate extends DeclinedEvent {
 
 /// [conversation]'s journey hasn't started, and the journey rule doesn't
 /// take it in. The next event from it is asked about again.
-final class NotTakenIn extends DeclinedEvent {
-  const NotTakenIn(
+final class ConversationNotTakenIn extends DeclinedKeyedEvent {
+  const ConversationNotTakenIn(
     super.event, {
     required super.by,
     required super.conversation,
@@ -275,8 +277,8 @@ final class NotTakenIn extends DeclinedEvent {
 }
 
 /// Something said that the turn rule says starts no turn.
-final class NotATurn extends DeclinedEvent {
-  const NotATurn(
+final class SaidStartsNoTurn extends DeclinedKeyedEvent {
+  const SaidStartsNoTurn(
     super.event, {
     required super.by,
     required super.conversation,
@@ -286,8 +288,8 @@ final class NotATurn extends DeclinedEvent {
 
 /// A verdict in [conversation], which is under no journey path, so no turn
 /// of the agent's there could have shown what was judged.
-final class JudgedUnplaced extends DeclinedEvent {
-  const JudgedUnplaced(
+final class ShownMessageJudgedUnplaced extends DeclinedKeyedEvent {
+  const ShownMessageJudgedUnplaced(
     super.event, {
     required super.by,
     required super.conversation,
@@ -296,9 +298,10 @@ final class JudgedUnplaced extends DeclinedEvent {
 }
 
 /// A change to [message], which was never admitted, or was admitted in a
-/// journey since ended, so there is no turn for it to change. `"message": <source>`.
-final class ChangesUnadmitted extends DeclinedEvent {
-  const ChangesUnadmitted(
+/// journey since ended, so there is no turn for it to change.
+/// `"message": <source>`.
+final class ChangeToUnadmittedMessage extends DeclinedKeyedEvent {
+  const ChangeToUnadmittedMessage(
     super.event, {
     required super.by,
     required super.conversation,

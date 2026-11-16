@@ -27,21 +27,21 @@ import 'reading.dart';
 /// with it, without asking.
 abstract interface class JourneyRule {
   /// The rules [first]'s journey is taken in under, or null when it isn't
-  /// taken in. Then [first] is [NotTakenIn], and the conversation's next
-  /// event is asked about again.
+  /// taken in. Then [first] is [ConversationNotTakenIn], and the
+  /// conversation's next event is asked about again.
   ///
   /// The rules are what the airlock enforces on each of the journey's
   /// paths, and the docking station never reads them: it records them in
   /// the entry that starts the journey, and copies them into each entry
   /// that starts one of its paths, where loop_launcher reads them (Nick,
   /// 16 Nov: the entry that starts a path records its rules).
-  JsonObject? takeIn(Admissible first);
+  JsonObject? takeIn(AdmissibleEvent first);
 }
 
 /// Whether something said starts a turn: a person's turn, in a journey
 /// path's terms, which the agent then takes its own turn in answer to.
 abstract interface class TurnRule {
   /// Whether [said] starts a turn under [placement]. When it doesn't, it
-  /// is [NotATurn], and nothing it would have started is started.
-  bool startsTurn(Said said, Placement placement);
+  /// is [SaidStartsNoTurn], and nothing it would have started is started.
+  bool startsTurn(MessageSaid said, AdmittedPlacement placement);
 }

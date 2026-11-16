@@ -4,7 +4,7 @@
 /// A module takes part only by describing (RULINGS, "The docking station admits
 /// events under journey paths"). The docking station hands its
 /// [ModuleReading] every event from the module's relay, in the record's
-/// order, and for each the reading says what it is: a [Reading]. The
+/// order, and for each the reading says what it is: a [EventReading]. The
 /// docking station never reads a module's bytes itself, and the module never
 /// learns which journey path anything went to.
 library;
@@ -24,9 +24,9 @@ import 'package:is_shapes/is_shapes.dart' show ActorId;
 /// kind `event`, or `arrived` if it was recorded before the rename (Nick,
 /// 16 Nov: "It's an event, not an arrival").
 ///
-/// Only [Event.read] makes one, from the entry's body as recorded.
-final class Event {
-  const Event._({
+/// Only [RelayedEvent.read] makes one, from the entry's body as recorded.
+final class RelayedEvent {
+  const RelayedEvent._({
     required this.entry,
     required this.at,
     required this.source,
@@ -48,7 +48,7 @@ final class Event {
 
   /// The event recorded at [entry], from its [body] as the relay recorded it.
   /// Null for anything else: it is our own wire, read strictly.
-  static Event? read(EntryHash entry, Uint8List body) {
+  static RelayedEvent? read(EntryHash entry, Uint8List body) {
     final Object? json;
     try {
       json = jsonDecode(utf8.decode(body));
@@ -70,7 +70,7 @@ final class Event {
         return null;
       }
       if (when == null || source.isEmpty) return null;
-      return Event._(entry: entry, at: when, source: source, bytes: raw);
+      return RelayedEvent._(entry: entry, at: when, source: source, bytes: raw);
     }
     return null;
   }
@@ -88,41 +88,41 @@ final class Event {
 /// same answer for the same events in the same order, and must not change
 /// the state it is given.
 abstract interface class ModuleReading<S> {
-  /// The [Event.source] whose events this reads.
+  /// The [RelayedEvent.source] whose events this reads.
   String get source;
 
   /// The state before any event.
   S get start;
 
   /// [event] read, after every earlier one from [source] has been.
-  (S, Reading) step(S state, Event event);
+  (S, EventReading) step(S state, RelayedEvent event);
 }
 
-/// What one event is: something said ([Said]), a change to an earlier
-/// message ([Changed]), a conversation joined ([Joined]), a person's verdict
-/// on something the agent showed ([Judged]), or nothing to admit
-/// ([NothingToAdmit]).
-sealed class Reading {
-  const Reading();
+/// What one event is: something said ([MessageSaid]), a change to an
+/// earlier message ([MessageChanged]), a conversation joined
+/// ([ConversationJoined]), a person's verdict on something the agent showed
+/// ([ShownMessageJudged]), or nothing to admit ([NothingToAdmit]).
+sealed class EventReading {
+  const EventReading();
 }
 
 /// Nothing to admit: a typing indicator, a reaction the module does not
 /// carry, an activity it cannot read.
-final class NothingToAdmit extends Reading {
+final class NothingToAdmit extends EventReading {
   const NothingToAdmit();
 }
 
 /// An event the docking station may admit, and what it needs to decide
 /// whether to.
-sealed class Admissible extends Reading {
-  const Admissible({
+sealed class AdmissibleEvent extends EventReading {
+  const AdmissibleEvent({
     required this.conversation,
     required this.within,
     required this.key,
   });
 
   /// The outside conversation it belongs to.
-  final Conversation conversation;
+  final ConversationId conversation;
 
   /// The conversation [conversation] sits inside, such as the channel a
   /// thread is in. Null when it sits inside none, as a chat or a channel
@@ -132,7 +132,7 @@ sealed class Admissible extends Reading {
   /// journey and each of its threads a journey path (Nick, 2026-11-15:
   /// "channel = journey, thread = journey path"). The reading names it so
   /// the docking station never reads a module's ids to find it.
-  final Conversation? within;
+  final ConversationId? within;
 
   /// Who it comes from, or null for no one the module can name.
   ActorId? get from;
@@ -151,8 +151,8 @@ sealed class Admissible extends Reading {
 /// such as who wrote a message it quotes (Nick, 2026-11-15: the reading
 /// carries the node). Someone the module can't name has said nothing it
 /// can admit, since a [UserSaid] always has an author.
-final class Said extends Admissible {
-  const Said({
+final class MessageSaid extends AdmissibleEvent {
+  const MessageSaid({
     required super.conversation,
     required super.within,
     required super.key,
@@ -175,8 +175,8 @@ final class Said extends Admissible {
 /// It is admitted whoever made it. Whether it counts is for whatever reads
 /// it: a change counts only when [from] is who said [message] (Nick, 16
 /// Nov, the rule `Withdrawal` keeps).
-final class Changed extends Admissible {
-  const Changed({
+final class MessageChanged extends AdmissibleEvent {
+  const MessageChanged({
     required super.conversation,
     required super.within,
     required this.from,
@@ -197,8 +197,8 @@ final class Changed extends Admissible {
 }
 
 /// [joiners] joined [conversation]. One event may bring in several.
-final class Joined extends Admissible {
-  const Joined._({
+final class ConversationJoined extends AdmissibleEvent {
+  const ConversationJoined._({
     required super.conversation,
     required super.within,
     required this.from,
@@ -214,16 +214,16 @@ final class Joined extends Admissible {
 
   /// A join of [joiners]; null when there are none, which is
   /// [NothingToAdmit].
-  static Joined? of({
-    required Conversation conversation,
-    required Conversation? within,
+  static ConversationJoined? of({
+    required ConversationId conversation,
+    required ConversationId? within,
     required ActorId? from,
     required EventKey key,
     required Iterable<ActorId> joiners,
   }) {
     final list = List<ActorId>.unmodifiable(joiners);
     if (list.isEmpty) return null;
-    return Joined._(
+    return ConversationJoined._(
       conversation: conversation,
       within: within,
       from: from,
@@ -235,15 +235,15 @@ final class Joined extends Admissible {
 
 /// A person's [verdict] on [to], something the agent showed them, such as
 /// Approve, Not yet or a proposed correction on a card (Nick, 2026-11-15;
-/// named `Judged` 16 Nov). Named for what the person said, not for the
-/// button, so a Slack button reads the same.
+/// named `Judged`, then `ShownMessageJudged`, 16 Nov). Named for what the
+/// person said, not for the button, so a Slack button reads the same.
 ///
 /// It names the message, never a turn: the journey path's apex builds the
 /// annotation, a `NodeApproval`, a `NodeSeenMark` or a `NodeCorrection`,
-/// once it knows which turn [to] showed. A verdict always names who gave it, since a
-/// verdict from no one approves nothing.
-final class Judged extends Admissible {
-  const Judged({
+/// once it knows which turn [to] showed. A verdict always names who gave
+/// it, since a verdict from no one approves nothing.
+final class ShownMessageJudged extends AdmissibleEvent {
+  const ShownMessageJudged({
     required super.conversation,
     required super.within,
     required this.from,
@@ -268,22 +268,22 @@ final class Judged extends Admissible {
 /// Written like an [ActorId], a source, a colon and the rest, such as
 /// `teams:19:abc@thread.v2`, so two modules never name two conversations
 /// alike.
-final class Conversation {
-  const Conversation._(this.value);
+final class ConversationId {
+  const ConversationId._(this.value);
 
   /// The id, as text.
   final String value;
 
   /// [s] as a conversation; null unless it is a source, a colon, and the
   /// rest, with the rest printable ASCII and no spaces.
-  static Conversation? parse(String s) =>
-      _id.hasMatch(s) ? Conversation._(s) : null;
+  static ConversationId? parse(String s) =>
+      _id.hasMatch(s) ? ConversationId._(s) : null;
 
   static final _id = RegExp(r'^[a-z][a-z0-9-]*:[\x21-\x7e]+$');
 
   @override
   bool operator ==(Object other) =>
-      other is Conversation && other.value == value;
+      other is ConversationId && other.value == value;
 
   @override
   int get hashCode => value.hashCode;

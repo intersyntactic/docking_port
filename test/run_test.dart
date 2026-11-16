@@ -16,7 +16,7 @@ import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy;
 import 'package:test/test.dart';
 
 final ann = ActorId.parse('teams:t/p')!;
-final chat = Conversation.parse('test:chat')!;
+final chat = ConversationId.parse('test:chat')!;
 
 /// A record in memory: entries in order, a follow that sends the backlog,
 /// then caught-up, then each new entry, and one chain of decisions whose
@@ -27,7 +27,7 @@ final class _Record {
   EntryHash? _tip;
 
   /// Each decision sent, refused or not, with what it followed.
-  final sent = <(EntryHash?, Decision)>[];
+  final sent = <(EntryHash?, AdmissionDecision)>[];
 
   /// Run once, as the next decision is sent, before it is checked.
   void Function()? beforeNextSend;
@@ -36,7 +36,7 @@ final class _Record {
   String? refuse;
 
   /// The decisions recorded, in order.
-  List<Decision> get decisions => [
+  List<AdmissionDecision> get decisions => [
     for (final frame in _entries) ?decodeDecision(frame.kind, frame.body),
   ];
 
@@ -83,7 +83,7 @@ final class _Record {
   );
 
   /// [decision], sent by another docking station, following the tip.
-  void decideElsewhere(Decision decision) {
+  void decideElsewhere(AdmissionDecision decision) {
     final (kind, body) = encodeDecision(decision);
     _tip = add(kind.name, _tip, body).hash;
   }
@@ -132,13 +132,13 @@ final class _Reading implements ModuleReading<int> {
   int get start => 0;
 
   @override
-  (int, Reading) step(int state, Event event) {
+  (int, EventReading) step(int state, RelayedEvent event) {
     given.add(event.entry);
     final what = jsonDecode(utf8.decode(event.bytes)) as Map<String, Object?>;
     if (what case {'said': final String text, 'key': final String key}) {
       return (
         state + 1,
-        Said(
+        MessageSaid(
           conversation: chat,
           within: null,
           key: EventKey.parse(key)!,
@@ -158,14 +158,15 @@ final class _TakesIn implements JourneyRule {
   const _TakesIn();
 
   @override
-  JsonObject takeIn(Admissible first) => const JsonObject.of({'tools': 'all'});
+  JsonObject takeIn(AdmissibleEvent first) =>
+      const JsonObject.of({'tools': 'all'});
 }
 
 final class _EverySaid implements TurnRule {
   const _EverySaid();
 
   @override
-  bool startsTurn(Said said, Placement placement) => true;
+  bool startsTurn(MessageSaid said, AdmittedPlacement placement) => true;
 }
 
 Future<void> _run(_Record record, _Reading reading) => runDockingStation(
@@ -186,10 +187,10 @@ Future<void> _runToEnd(_Record record, _Reading reading) async {
   await running;
 }
 
-Admitted _startsChat(EntryHash event, String key) => Admitted(
+EventAdmitted _startsChat(EntryHash event, String key) => EventAdmitted(
   event,
   by: DecidedBy.rules,
-  reading: Said(
+  reading: MessageSaid(
     conversation: chat,
     within: null,
     key: EventKey.parse(key)!,
@@ -217,7 +218,7 @@ void main() {
     expect(first.event, a.hash);
     expect(first.by, DecidedBy.rules);
     expect(
-      (first as Admitted).placement,
+      (first as EventAdmitted).placement,
       isA<StartsJourneyPath>().having(
         (p) => p.journey,
         'journey',
@@ -227,7 +228,7 @@ void main() {
     expect(secondFollows, firstEntry);
     expect(second.event, b.hash);
     expect(
-      ((second as Admitted).placement as Under).journeyPath.hex,
+      ((second as EventAdmitted).placement as UnderJourneyPath).journeyPath.hex,
       firstEntry.hex,
     );
   });
@@ -247,7 +248,9 @@ void main() {
     expect(follows, aDecision);
     expect(decision.event, b.hash);
     expect(
-      ((decision as Admitted).placement as Under).journeyPath.hex,
+      ((decision as EventAdmitted).placement as UnderJourneyPath)
+          .journeyPath
+          .hex,
       aDecision.hex,
     );
   });
@@ -275,7 +278,7 @@ void main() {
     record.decideElsewhere(_startsChat(a0.hash, 'a0'));
     final a = record.recordEvent({'said': 'again', 'key': 'a'});
     record.beforeNextSend = () => record.decideElsewhere(
-      NotATurn(
+      SaidStartsNoTurn(
         a.hash,
         by: DecidedBy.rules,
         conversation: chat,
@@ -286,7 +289,7 @@ void main() {
 
     expect(record.sent, hasLength(1));
     expect(record.decisions.map((d) => d.event), [a0.hash, a.hash]);
-    expect(record.decisions.last, isA<NotATurn>());
+    expect(record.decisions.last, isA<SaidStartsNoTurn>());
   });
 
   test('a refusal while the chain has not moved is rethrown', () async {
@@ -322,7 +325,7 @@ void main() {
     await _runToEnd(record, reading);
 
     final [(_, decision)] = record.sent;
-    expect(decision, isA<Unread>());
+    expect(decision, isA<NoReadingForSource>());
     expect(decision.event, x.hash);
     expect(reading.given, isEmpty);
   });

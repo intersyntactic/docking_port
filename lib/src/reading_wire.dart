@@ -31,27 +31,28 @@ const readingNodeShapes = <String, Set<String>>{
 ///     {"case": <case>, "conversation": <id>, "within": <id>?,
 ///      "key": <key>, ...the case's own fields}
 ///
-/// `<case>` and its fields are `said`, with `"node"`, a [UserSaid];
-/// `changed`, with `"from"?`, `"message"` and `"change"`, a [WhatChanged];
-/// `joined`, with `"from"?` and `"joiners"`; `judged`, with `"from"`,
-/// `"to"` and `"verdict"`, a [VerdictOnShownMessage].
-JsonObject encodeReading(Admissible reading) => JsonObject.of({
+/// `<case>` and its fields are `message-said`, with `"node"`, a
+/// [UserSaid]; `message-changed`, with `"from"?`, `"message"` and
+/// `"change"`, a [WhatChanged]; `conversation-joined`, with `"from"?` and
+/// `"joiners"`; `shown-message-judged`, with `"from"`, `"to"` and
+/// `"verdict"`, a [VerdictOnShownMessage].
+JsonObject encodeReading(AdmissibleEvent reading) => JsonObject.of({
   'case': _case(reading),
   'conversation': reading.conversation.value,
   'within': ?reading.within?.value,
   'key': reading.key.value,
   ...switch (reading) {
-    Said(:final node) => {'node': node.toJson()},
-    Changed(:final from, :final message, :final change) => {
+    MessageSaid(:final node) => {'node': node.toJson()},
+    MessageChanged(:final from, :final message, :final change) => {
       'from': ?from?.value,
       'message': message.value,
       'change': change.toJson(),
     },
-    Joined(:final from, :final joiners) => {
+    ConversationJoined(:final from, :final joiners) => {
       'from': ?from?.value,
       'joiners': [for (final joiner in joiners) joiner.value],
     },
-    Judged(:final from, :final to, :final verdict) => {
+    ShownMessageJudged(:final from, :final to, :final verdict) => {
       'from': from.value,
       'to': to.value,
       'verdict': verdict.toJson(),
@@ -59,28 +60,28 @@ JsonObject encodeReading(Admissible reading) => JsonObject.of({
   },
 });
 
-String _case(Admissible reading) => switch (reading) {
-  Said() => 'said',
-  Changed() => 'changed',
-  Joined() => 'joined',
-  Judged() => 'judged',
+String _case(AdmissibleEvent reading) => switch (reading) {
+  MessageSaid() => 'message-said',
+  MessageChanged() => 'message-changed',
+  ConversationJoined() => 'conversation-joined',
+  ShownMessageJudged() => 'shown-message-judged',
 };
 
 /// [json] read back as the reading [encodeReading] wrote. A
 /// [FormatException] for anything it doesn't write: an unknown case, a
 /// field missing, extra or malformed, a node its package won't read.
-Admissible decodeReading(JsonObject json) {
-  final conversation = _parse(json, 'conversation', Conversation.parse);
+AdmissibleEvent decodeReading(JsonObject json) {
+  final conversation = _parse(json, 'conversation', ConversationId.parse);
   final within = json.has('within')
-      ? _parse(json, 'within', Conversation.parse)
+      ? _parse(json, 'within', ConversationId.parse)
       : null;
   final key = _parse(json, 'key', EventKey.parse);
   ActorId? from() =>
       json.has('from') ? _parse(json, 'from', ActorId.parse) : null;
 
   final (reading, fields) = switch (json.string('case')) {
-    'said' => (
-      Said(
+    'message-said' => (
+      MessageSaid(
         conversation: conversation,
         within: within,
         key: key,
@@ -88,8 +89,8 @@ Admissible decodeReading(JsonObject json) {
       ),
       const {'node'},
     ),
-    'changed' => (
-      Changed(
+    'message-changed' => (
+      MessageChanged(
         conversation: conversation,
         within: within,
         from: from(),
@@ -99,8 +100,8 @@ Admissible decodeReading(JsonObject json) {
       ),
       const {'from', 'message', 'change'},
     ),
-    'joined' => (
-      Joined.of(
+    'conversation-joined' => (
+      ConversationJoined.of(
             conversation: conversation,
             within: within,
             from: from(),
@@ -114,8 +115,8 @@ Admissible decodeReading(JsonObject json) {
           (throw JsonFieldException('joiners', 'a list of one or more')),
       const {'from', 'joiners'},
     ),
-    'judged' => (
-      Judged(
+    'shown-message-judged' => (
+      ShownMessageJudged(
         conversation: conversation,
         within: within,
         from: _parse(json, 'from', ActorId.parse),
