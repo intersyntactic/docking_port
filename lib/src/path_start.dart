@@ -61,7 +61,7 @@ final class UnreadablePathEntry<R> extends AdmittedPathEntry<R> {
 }
 
 /// The record entry [entry] (its bytes as the record holds them, the
-/// `<kind>\n<follows>\n` header included, which its ids are hashes of),
+/// `<kind>\n<previous>\n` header included, which its ids are hashes of),
 /// read for the journey path it starts. [rules] reads the rules from their
 /// JSON, null when they aren't rules.
 AdmittedPathEntry<R> readPathStart<R>(
@@ -72,7 +72,7 @@ AdmittedPathEntry<R> readPathStart<R>(
 
   final first = entry.indexOf(0x0a);
   final second = first < 0 ? -1 : entry.indexOf(0x0a, first + 1);
-  if (second < 0) return unreadable('no `<kind>\\n<follows>\\n` header');
+  if (second < 0) return unreadable('no `<kind>\\n<previous>\\n` header');
   final kind = ascii.decode(
     Uint8List.sublistView(entry, 0, first),
     allowInvalid: true,
