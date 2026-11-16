@@ -5,10 +5,17 @@
 /// starts a turn, and that none is admitted twice.
 ///
 /// So far, the reading contract: a module's [ModuleReading], a fold over
-/// its relay's [Arrival]s that names what each one is, a [Reading].
+/// its relay's [Arrival]s that names what each one is, a [Reading]. And,
+/// as types to agree on before the logic: the [Decision] recorded for each
+/// arrival, [Admitted] or [Declined]; the rules passed in, [JourneyRule]
+/// and [TurnRule]; and [Decided], what the decisions add up to when read
+/// back.
 ///
-/// Not here yet: admitting, the `admitted` entry, and handing an arrival to
-/// a journey path's apex.
+/// Not here yet: deciding, the decision entries' bytes, and handing an
+/// arrival to a journey path's apex.
 library;
 
+export 'src/decided.dart';
+export 'src/decision.dart';
 export 'src/reading.dart';
+export 'src/rules.dart';
