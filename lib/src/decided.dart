@@ -73,8 +73,10 @@ final class Decided {
     switch (decision) {
       case Admitted():
         _admit(entry, decision);
+      // The first event with a key keeps it, so every duplicate after names
+      // that one, never the copy before it.
       case DeclinedEvent(:final conversation, :final key, :final event):
-        _events[(conversation, key)] = event;
+        _events.putIfAbsent((conversation, key), () => event);
       case Unread() || NotAdmissible():
         break;
     }
