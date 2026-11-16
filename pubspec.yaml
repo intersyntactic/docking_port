@@ -14,6 +14,7 @@ dependencies:
     git:
       url: https://github.com/intersyntactic/agent_loop.git
       ref: 207690a
+  checked_json: ^0.2.1
   is_annotation_shapes:
     git:
       url: https://github.com/intersyntactic/annotation_shapes.git

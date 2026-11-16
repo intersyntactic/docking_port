@@ -1,8 +1,6 @@
 /// Deciding one event: whether it comes in, and where it goes.
 library;
 
-import 'package:is_conversation_shapes/is_conversation_shapes.dart'
-    show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show DecidedBy;
 
@@ -53,21 +51,13 @@ Decision decide(
     );
   }
 
-  Admitted admit(Placement placement, {SourceMessageId? message}) => Admitted(
-    event,
-    by: by,
-    conversation: conversation,
-    within: admissible.within,
-    key: key,
-    from: admissible.from,
-    message: message,
-    placement: placement,
-  );
+  Admitted admit(Placement placement) =>
+      Admitted(event, by: by, reading: admissible, placement: placement);
 
   switch (admissible) {
     case Changed(:final message):
       return switch (decided.journeyPathOfMessage(conversation, message)) {
-        final path? => admit(Under(path), message: message),
+        final path? => admit(Under(path)),
         null => ChangesUnadmitted(
           event,
           by: by,
@@ -76,9 +66,9 @@ Decision decide(
           message: message,
         ),
       };
-    case Judged(:final to):
+    case Judged():
       return switch (decided.journeyPathOf(conversation)) {
-        final path? => admit(Under(path), message: to),
+        final path? => admit(Under(path)),
         null => JudgedUnplaced(
           event,
           by: by,
@@ -101,7 +91,7 @@ Decision decide(
         return NotTakenIn(event, by: by, conversation: conversation, key: key);
       }
       return turns.startsTurn(admissible, placement)
-          ? admit(placement, message: admissible.message)
+          ? admit(placement)
           : NotATurn(event, by: by, conversation: conversation, key: key);
   }
 }

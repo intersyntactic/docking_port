@@ -5,15 +5,17 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
-    show ActorId, DecidedBy, JourneyId, JourneyPathId;
+    show DecidedBy, JourneyId, JourneyPathId;
 
 import 'decision.dart';
 import 'reading.dart';
+import 'reading_wire.dart';
 
 /// [decision] as the entry the docking station sends: its kind, and its body.
 (Kind, Uint8List) encodeDecision(Decision decision) {
@@ -23,12 +25,7 @@ import 'reading.dart';
   };
   switch (decision) {
     case Admitted():
-      json
-        ..['conversation'] = decision.conversation.value
-        ..['key'] = decision.key.value;
-      if (decision.within case final within?) json['within'] = within.value;
-      if (decision.from case final from?) json['from'] = from.value;
-      if (decision.message case final message?) json['message'] = message.value;
+      json['reading'] = encodeReading(decision.reading);
       switch (decision.placement) {
         case Under(:final journeyPath):
           json['journeyPath'] = journeyPath.hex;
@@ -102,26 +99,16 @@ Decision? decodeDecision(Kind kind, Uint8List body) {
 DecidedBy? _decidedBy(String name) => DecidedBy.values.asNameMap()[name];
 
 Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
-  final conversation = _read(json['conversation'], Conversation.parse);
-  final key = _read(json['key'], EventKey.parse);
-  if (conversation == null || key == null) return null;
-  final fields = {'event', 'by', 'conversation', 'key'};
-
-  // An optional field: absent, or present and well formed.
-  T? optional<T extends Object>(String name, T? Function(String) parse) {
-    if (!json.containsKey(name)) return null;
-    fields.add(name);
-    return _read(json[name], parse);
-  }
-
-  final within = optional('within', Conversation.parse);
-  final from = optional('from', ActorId.parse);
-  final message = optional('message', SourceMessageId.parse);
-  // A field that is present but malformed is in [fields] and read as null,
-  // so the two counts differ.
-  if (fields.length != 4 + [within, from, message].nonNulls.length) {
+  final Admissible reading;
+  try {
+    reading = decodeReading(
+      JsonObject.parse(json['reading']) ??
+          (throw const FormatException('`reading` is not an object')),
+    );
+  } on FormatException {
     return null;
   }
+  final fields = {'event', 'by', 'reading'};
 
   final Placement placement;
   if (json.containsKey('journeyPath')) {
@@ -141,16 +128,7 @@ Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
     }
   }
   if (json.length != fields.length) return null;
-  return Admitted(
-    event,
-    by: by,
-    conversation: conversation,
-    within: within,
-    key: key,
-    from: from,
-    message: message,
-    placement: placement,
-  );
+  return Admitted(event, by: by, reading: reading, placement: placement);
 }
 
 JourneyPlacement? _readJourney(Map<String, Object?> json, Set<String> fields) {

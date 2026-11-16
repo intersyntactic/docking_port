@@ -114,44 +114,46 @@ sealed class Decision {
   final DecidedBy by;
 }
 
-/// [event] admitted by [placement]: [key] in [conversation],
-/// which sits within [within], from [from], about [message].
+/// [event], read as [reading], admitted by [placement].
 ///
 /// The entry, of kind `admitted`:
 ///
-///     {"event": <hex>, "by": <who>, "conversation": <id>, "within": <id>?,
-///      "key": <key>, "from": <actor id>?, "message": <source>?,
-///      ...the placement}
+///     {"event": <hex>, "by": <who>, "reading": <reading>, ...the placement}
 ///
-/// The placement is `"journeyPath": <id>` for [Under];
-/// `"startsJourneyPath": true` and the journey for [StartsJourneyPath]; the
-/// journey alone for [IntoJourney]. The journey is `"journey": <id>` for
-/// [InJourney], or `"startsJourney": true` for [StartsJourney].
+/// `<reading>` is the whole reading, as [encodeReading] writes it (Nick,
+/// 16 Nov: the `admitted` entry carries the reading), so whatever hands the
+/// event to its journey path's apex reads the node from the decision, and
+/// never reads a module's bytes. The placement is `"journeyPath": <id>` for
+/// [Under]; `"startsJourneyPath": true` and the journey for
+/// [StartsJourneyPath]; the journey alone for [IntoJourney]. The journey is
+/// `"journey": <id>` for [InJourney], or `"startsJourney": true` for
+/// [StartsJourney].
 ///
-/// [within] is kept so which journey an outside conversation is can be
-/// rebuilt from decisions alone; [from], for rules about who starts turns,
-/// such as a cap on turns bots start.
+/// The reading's [within] is kept so which journey an outside conversation
+/// is can be rebuilt from decisions alone; its [from], for rules about who
+/// starts turns, such as a cap on turns bots start.
 final class Admitted extends Decision {
   const Admitted(
     super.event, {
     required super.by,
-    required this.conversation,
-    required this.within,
-    required this.key,
-    required this.from,
-    required this.message,
+    required this.reading,
     required this.placement,
   });
 
-  final Conversation conversation;
-  final Conversation? within;
-  final EventKey key;
-  final ActorId? from;
+  final Admissible reading;
+  final Placement placement;
+
+  Conversation get conversation => reading.conversation;
+  Conversation? get within => reading.within;
+  EventKey get key => reading.key;
+  ActorId? get from => reading.from;
 
   /// The message it says, changes or judges; null for a join.
-  final SourceMessageId? message;
-
-  final Placement placement;
+  SourceMessageId? get message => switch (reading) {
+    Said(:final message) || Changed(:final message) => message,
+    Judged(:final to) => to,
+    Joined() => null,
+  };
 }
 
 /// [event] declined: nothing comes of it, and nothing will, whatever

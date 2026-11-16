@@ -188,11 +188,16 @@ Future<void> _runToEnd(_Record record, _Reading reading) async {
 Admitted _startsChat(EntryHash event, String key) => Admitted(
   event,
   by: DecidedBy.rules,
-  conversation: chat,
-  within: null,
-  key: EventKey.parse(key)!,
-  from: ann,
-  message: SourceMessageId.parse('chat|$key')!,
+  reading: Said(
+    conversation: chat,
+    within: null,
+    key: EventKey.parse(key)!,
+    node: UserSaid(
+      author: ann,
+      source: SourceMessageId.parse('chat|$key')!,
+      text: 'hi',
+    ),
+  ),
   placement: const StartsJourneyPath(StartsJourney()),
 );
 

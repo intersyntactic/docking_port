@@ -4,8 +4,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:is_annotation_shapes/is_annotation_shapes.dart' show Proposed;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
-    show SourceMessageId;
+    show Deleted, Edited, SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_journal/service.dart' show Kind;
@@ -21,16 +22,51 @@ final key = EventKey.parse('message:1')!;
 final from = ActorId.parse('teams:t/p')!;
 final message = SourceMessageId.parse('19:x;messageid=1|1')!;
 
-Admitted _admitted(Placement placement, DecidedBy by) => Admitted(
-  event,
-  by: by,
+final said = Said(
   conversation: conversation,
   within: within,
   key: key,
-  from: from,
-  message: message,
-  placement: placement,
+  node: UserSaid(author: from, source: message, text: 'hi'),
 );
+
+/// One reading of each case, each reading back as itself.
+final readings = <Admissible>[
+  said,
+  Changed(
+    conversation: conversation,
+    within: within,
+    from: from,
+    key: key,
+    message: message,
+    change: const Edited(text: 'hello'),
+  ),
+  Changed(
+    conversation: conversation,
+    within: null,
+    from: null,
+    key: key,
+    message: message,
+    change: const Deleted(),
+  ),
+  Joined.of(
+    conversation: within,
+    within: null,
+    from: from,
+    key: key,
+    joiners: [from, ActorId.parse('teams:bot')!],
+  )!,
+  Judged(
+    conversation: conversation,
+    within: within,
+    from: from,
+    key: key,
+    to: message,
+    verdict: Proposed({'note': 'not yet'}),
+  ),
+];
+
+Admitted _admitted(Placement placement, DecidedBy by) =>
+    Admitted(event, by: by, reading: said, placement: placement);
 
 String _text((Kind, Uint8List) entry) => utf8.decode(entry.$2);
 
@@ -42,32 +78,11 @@ void main() {
     expect(entry.$1, DecisionKind.admitted);
     expect(
       _text(entry),
-      '{"event":"$_a","by":"rules",'
-      '"conversation":"teams:19:x;messageid=1",'
-      '"key":"message:1","within":"teams:19:x","from":"teams:t/p",'
-      '"message":"19:x;messageid=1|1","startsJourneyPath":true,'
-      '"startsJourney":true}',
-    );
-  });
-
-  test('an admission the person said yes to', () {
-    final entry = encodeDecision(
-      Admitted(
-        event,
-        by: DecidedBy.person,
-        conversation: within,
-        within: null,
-        key: key,
-        from: null,
-        message: null,
-        placement: const StartsJourneyPath(StartsJourney()),
-      ),
-    );
-    expect(entry.$1, DecisionKind.admitted);
-    expect(
-      _text(entry),
-      '{"event":"$_a","by":"person","conversation":"teams:19:x",'
-      '"key":"message:1","startsJourneyPath":true,"startsJourney":true}',
+      '{"event":"$_a","by":"rules","reading":{"case":"said",'
+      '"conversation":"teams:19:x;messageid=1","within":"teams:19:x",'
+      '"key":"message:1","node":{"shape":"UserSaid","author":"teams:t/p",'
+      '"source":"19:x;messageid=1|1","text":"hi"}},'
+      '"startsJourneyPath":true,"startsJourney":true}',
     );
   });
 
@@ -97,14 +112,12 @@ void main() {
         _admitted(Under(path), by),
         _admitted(StartsJourneyPath(InJourney(journey)), by),
         _admitted(const StartsJourneyPath(StartsJourney()), by),
+        for (final reading in readings)
+          Admitted(event, by: by, reading: reading, placement: Under(path)),
         Admitted(
           event,
           by: by,
-          conversation: within,
-          within: null,
-          key: key,
-          from: null,
-          message: null,
+          reading: readings[3],
           placement: IntoJourney(InJourney(journey)),
         ),
         _admitted(const IntoJourney(StartsJourney()), by),
@@ -141,24 +154,104 @@ void main() {
   test('anything else reads as null', () {
     Uint8List bytes(Map<String, Object?> json) =>
         Uint8List.fromList(utf8.encode(jsonEncode(json)));
+    final reading = {
+      'case': 'said',
+      'conversation': 'teams:c',
+      'key': 'k',
+      'node': {
+        'shape': 'UserSaid',
+        'author': 'teams:p',
+        'source': 'c|1',
+        'text': 'hi',
+      },
+    };
     final good = {
       'event': _a,
       'by': 'rules',
-      'conversation': 'teams:c',
-      'key': 'k',
+      'reading': reading,
       'journeyPath': _c,
     };
     expect(decodeDecision(DecisionKind.admitted, bytes(good)), isNotNull);
     final bad = <(Kind, Map<String, Object?>)>[
       (DecisionKind.declined, good),
       (DecisionKind.admitted, {...good, 'extra': 1}),
-      (DecisionKind.admitted, {...good}..remove('key')),
+      (DecisionKind.admitted, {...good}..remove('reading')),
+      (DecisionKind.admitted, {...good, 'reading': 'said'}),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {...reading, 'extra': 1},
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {...reading}..remove('key'),
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {...reading, 'case': 'x'},
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {...reading, 'from': 'teams:p'},
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {...reading, 'within': null},
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {
+            ...reading,
+            'node': {'shape': 'Edited', 'text': 'hi'},
+          },
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {
+            'case': 'joined',
+            'conversation': 'teams:c',
+            'key': 'k',
+            'joiners': <String>[],
+          },
+        },
+      ),
+      (
+        DecisionKind.admitted,
+        {
+          ...good,
+          'reading': {
+            'case': 'judged',
+            'conversation': 'teams:c',
+            'key': 'k',
+            'to': 'c|1',
+            'verdict': {'shape': 'Approved'},
+          },
+        },
+      ),
+      (DecisionKind.admitted, {...good, 'conversation': 'teams:c'}),
       (DecisionKind.admitted, {...good}..remove('by')),
       (DecisionKind.admitted, {...good, 'by': 'nick'}),
       (DecisionKind.admitted, {...good, 'by': null}),
       (DecisionKind.admitted, {...good, 'event': 'nothex'}),
-      (DecisionKind.admitted, {...good, 'within': 'no-colon'}),
-      (DecisionKind.admitted, {...good, 'from': null}),
       (DecisionKind.admitted, {...good, 'journey': _b}),
       (
         DecisionKind.admitted,
