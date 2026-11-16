@@ -7,7 +7,7 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_journal/is_journal.dart' show EntryHash;
-import 'package:is_shapes/is_shapes.dart' show ActorId, JourneyId;
+import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy, JourneyId;
 import 'package:test/test.dart';
 
 final class _All implements JourneyRule, TurnRule {
@@ -98,6 +98,56 @@ void main() {
       ),
     );
     expect(second.rules?.asUncheckedMap(), {'asked': 1});
+  });
+
+  test('after a journey ends, its conversation starts a new path in the '
+      'same journey, under the same rules', () {
+    final channel = Conversation.parse('test:channel')!;
+    Said said(String key) => Said(
+      conversation: Conversation.parse('test:channel;t1')!,
+      within: channel,
+      key: EventKey.parse(key)!,
+      node: UserSaid(
+        author: ActorId.parse('teams:t/p')!,
+        source: SourceMessageId.parse('t1|$key')!,
+        text: 'hi',
+      ),
+    );
+    final rule = _Counting();
+    final decided = Decided();
+    Decision step(String key) {
+      final decision = decide(
+        _hash(key),
+        said(key),
+        decided,
+        journeys: rule,
+        turns: _All(),
+      );
+      decided.take(_hash('decision $key'), decision);
+      return decision;
+    }
+
+    final first = step('a') as Admitted;
+    final journey = JourneyId.parse(_hash('decision a').hex)!;
+    expect(
+      step('b'),
+      isA<Admitted>().having((a) => a.placement, 'placement', isA<Under>()),
+    );
+    decided.take(
+      _hash('end'),
+      Ended(_hash('asked to end'), by: DecidedBy.person, journey: journey),
+    );
+    final again = step('c') as Admitted;
+    expect(
+      again.placement,
+      isA<StartsJourneyPath>().having(
+        (p) => p.journey,
+        'journey',
+        isA<InJourney>().having((j) => j.journey, 'journey', journey),
+      ),
+    );
+    expect(again.rules?.asUncheckedMap(), first.rules?.asUncheckedMap());
+    expect(rule.asked, 1);
   });
 }
 

@@ -36,6 +36,8 @@ import 'reading_wire.dart';
           _journey(json, journey);
       }
       if (decision.rules case final rules?) json['rules'] = rules;
+    case Ended(:final journey):
+      json['journey'] = journey.hex;
     case Declined():
       json['why'] = _why(decision);
       if (decision case DeclinedEvent(:final conversation, :final key)) {
@@ -52,9 +54,11 @@ import 'reading_wire.dart';
           break;
       }
   }
-  final kind = decision is Admitted
-      ? DecisionKind.admitted
-      : DecisionKind.declined;
+  final kind = switch (decision) {
+    Admitted() => DecisionKind.admitted,
+    Declined() => DecisionKind.declined,
+    Ended() => DecisionKind.ended,
+  };
   return (kind, Uint8List.fromList(utf8.encode(jsonEncode(json))));
 }
 
@@ -93,6 +97,11 @@ Decision? decodeDecision(Kind kind, Uint8List body) {
   if (event == null || by == null) return null;
   if (kind == DecisionKind.admitted) return _admitted(event, by, json);
   if (kind == DecisionKind.declined) return _declined(event, by, json);
+  if (kind == DecisionKind.ended) {
+    final journey = _read(json['journey'], JourneyId.parse);
+    if (journey == null || json.length != 3) return null;
+    return Ended(event, by: by, journey: journey);
+  }
   return null;
 }
 

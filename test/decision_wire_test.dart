@@ -131,6 +131,7 @@ void main() {
           placement: IntoJourney(InJourney(journey)),
         ),
         _admitted(const IntoJourney(StartsJourney()), by),
+        Ended(event, by: by, journey: journey),
         Unread(event, by: by),
         NotAdmissible(event, by: by),
         Duplicate(
@@ -284,6 +285,13 @@ void main() {
         {'event': _a, 'by': 'rules', 'why': 'never-heard-of-it'},
       ),
       (DecisionKind.declined, {'event': _a, 'why': 'unread'}),
+      (DecisionKind.ended, {'event': _a, 'by': 'rules'}),
+      (DecisionKind.ended, {'event': _a, 'by': 'rules', 'journey': 'x'}),
+      (
+        DecisionKind.ended,
+        {'event': _a, 'by': 'rules', 'journey': _b, 'why': 'done'},
+      ),
+      (DecisionKind.admitted, {'event': _a, 'by': 'rules', 'journey': _b}),
       (Kind.parse('event')!, {'event': _a, 'by': 'rules', 'why': 'unread'}),
     ];
     for (final (kind, json) in bad) {

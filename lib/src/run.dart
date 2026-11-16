@@ -97,7 +97,7 @@ Future<void> runDockingStation({
   }
 
   var caughtUp = false;
-  final kinds = {..._eventKinds, DecisionKind.admitted, DecisionKind.declined};
+  final kinds = {..._eventKinds, ...DecisionKind.all};
   await for (final item in follow(kinds)) {
     switch (item) {
       case JournalEntryFrame(:final hash, :final kind)

@@ -37,13 +37,19 @@ import 'reading.dart';
 import 'rules.dart';
 
 /// The kinds of entry the docking station sends, one per event. Its user's
-/// row in the record's sender table allows these two and nothing else.
+/// row in the record's sender table allows these three and nothing else.
 abstract final class DecisionKind {
   /// An [Admitted]'s kind.
   static final admitted = Kind.parse('admitted')!;
 
   /// A [Declined]'s kind.
   static final declined = Kind.parse('declined')!;
+
+  /// An [Ended]'s kind.
+  static final ended = Kind.parse('ended')!;
+
+  /// Every kind above, as the docking station follows its own decisions.
+  static final all = {admitted, declined, ended};
 }
 
 /// Where an admitted event goes. Something said, or a change, goes
@@ -183,6 +189,25 @@ final class Admitted extends Decision {
   };
 }
 
+/// [journey] ended, at [event]: its loops stop, its programs close and its
+/// users are freed (loop_launcher), and the record takes nothing more on
+/// its paths' chains (is_journal). The person's next message in it opens it
+/// again, on a new path (RULINGS).
+///
+/// The docking station ends journeys (Nick, 16 Nov: "probably the docking
+/// station should end a journey, no?", and not as a tool of the agent's).
+/// What event ends one is not decided yet, so nothing decides one here; it
+/// is read back like any other decision.
+///
+/// The entry, of kind `ended`:
+///
+///     {"event": <hex>, "by": <who>, "journey": <id>}
+final class Ended extends Decision {
+  const Ended(super.event, {required super.by, required this.journey});
+
+  final JourneyId journey;
+}
+
 /// [event] declined: nothing comes of it, and nothing will, whatever
 /// changes later. The case says why.
 ///
@@ -270,8 +295,8 @@ final class JudgedUnplaced extends DeclinedEvent {
   });
 }
 
-/// A change to [message], which was never admitted, so there is no turn
-/// for it to change. `"message": <source>`.
+/// A change to [message], which was never admitted, or was admitted in a
+/// journey since ended, so there is no turn for it to change. `"message": <source>`.
 final class ChangesUnadmitted extends DeclinedEvent {
   const ChangesUnadmitted(
     super.event, {

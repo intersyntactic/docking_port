@@ -30,6 +30,7 @@ final class Decided {
   final _decidedEvents = <EntryHash>{};
   final _events = <(Conversation, EventKey), EntryHash>{};
   final _journeyPaths = <Conversation, JourneyPathId>{};
+  final _pathJourneys = <JourneyPathId, JourneyId>{};
   final _journeys = <Conversation, JourneyId>{};
   final _rules = <JourneyId, JsonObject>{};
   final _messages = <(Conversation, SourceMessageId), JourneyPathId>{};
@@ -83,9 +84,25 @@ final class Decided {
       // that one, never the copy before it.
       case DeclinedEvent(:final conversation, :final key, :final event):
         _events.putIfAbsent((conversation, key), () => event);
+      case Ended(:final journey):
+        _end(journey);
       case Unread() || NotAdmissible():
         break;
     }
+  }
+
+  /// Forgets [journey]'s paths, whose chains the record now closes, and
+  /// the messages admitted under them. A conversation in it then starts a
+  /// new path, in the same journey, and a change to a message admitted
+  /// before the end is a change to one never admitted.
+  void _end(JourneyId journey) {
+    final ended = {
+      for (final MapEntry(key: path, value: of) in _pathJourneys.entries)
+        if (of == journey) path,
+    };
+    _journeyPaths.removeWhere((_, path) => ended.contains(path));
+    _messages.removeWhere((_, path) => ended.contains(path));
+    _pathJourneys.removeWhere((path, _) => ended.contains(path));
   }
 
   void _admit(EntryHash entry, Admitted admitted) {
@@ -93,22 +110,19 @@ final class Decided {
     _events[(conversation, key)] = admitted.event;
     final outside = admitted.within ?? conversation;
 
-    void journey(JourneyPlacement placement) {
-      if (placement is StartsJourney) {
-        final journey = _journeys[outside] = JourneyId.parse(entry.hex)!;
-        _rules[journey] = admitted.rules!;
-      }
-    }
+    JourneyId journey(JourneyPlacement placement) => switch (placement) {
+      InJourney(:final journey) => journey,
+      StartsJourney() => _start(entry, outside, admitted.rules!),
+    };
 
     final JourneyPathId? journeyPath;
     switch (admitted.placement) {
       case Under(journeyPath: final under):
         journeyPath = under;
       case StartsJourneyPath(journey: final placement):
-        journey(placement);
-        journeyPath = _journeyPaths[conversation] = JourneyPathId.parse(
-          entry.hex,
-        )!;
+        final path = journeyPath = JourneyPathId.parse(entry.hex)!;
+        _journeyPaths[conversation] = path;
+        _pathJourneys[path] = journey(placement);
       case IntoJourney(journey: final placement):
         journey(placement);
         journeyPath = null;
@@ -116,5 +130,12 @@ final class Decided {
     if ((journeyPath, message) case (final path?, final message?)) {
       _messages[(conversation, message)] = path;
     }
+  }
+
+  /// Starts the journey [outside] is, named by [entry], under [rules].
+  JourneyId _start(EntryHash entry, Conversation outside, JsonObject rules) {
+    final journey = _journeys[outside] = JourneyId.parse(entry.hex)!;
+    _rules[journey] = rules;
+    return journey;
   }
 }
