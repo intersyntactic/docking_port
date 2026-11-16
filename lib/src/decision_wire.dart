@@ -18,16 +18,16 @@ import 'reading.dart';
 import 'reading_wire.dart';
 
 /// [decision] as the entry the docking station sends: its kind, and its body.
-(Kind, Uint8List) encodeDecision(Decision decision) {
+(Kind, Uint8List) encodeDecision(AdmissionDecision decision) {
   final json = <String, Object?>{
     'event': decision.event.hex,
     'by': decision.by.name,
   };
   switch (decision) {
-    case Admitted():
+    case EventAdmitted():
       json['reading'] = encodeReading(decision.reading);
       switch (decision.placement) {
-        case Under(:final journeyPath):
+        case UnderJourneyPath(:final journeyPath):
           json['journeyPath'] = journeyPath.hex;
         case StartsJourneyPath(:final journey):
           json['startsJourneyPath'] = true;
@@ -36,28 +36,28 @@ import 'reading_wire.dart';
           _journey(json, journey);
       }
       if (decision.rules case final rules?) json['rules'] = rules;
-    case Ended(:final journey):
+    case JourneyEnded(:final journey):
       json['journey'] = journey.hex;
-    case Declined():
+    case EventDeclined():
       json['why'] = _why(decision);
-      if (decision case DeclinedEvent(:final conversation, :final key)) {
+      if (decision case DeclinedKeyedEvent(:final conversation, :final key)) {
         json
           ..['conversation'] = conversation.value
           ..['key'] = key.value;
       }
       switch (decision) {
-        case Duplicate(:final of):
+        case DuplicateEvent(:final of):
           json['of'] = of.hex;
-        case ChangesUnadmitted(:final message):
+        case ChangeToUnadmittedMessage(:final message):
           json['message'] = message.value;
         case _:
           break;
       }
   }
   final kind = switch (decision) {
-    Admitted() => DecisionKind.admitted,
-    Declined() => DecisionKind.declined,
-    Ended() => DecisionKind.ended,
+    EventAdmitted() => DecisionEntryKind.admitted,
+    EventDeclined() => DecisionEntryKind.declined,
+    JourneyEnded() => DecisionEntryKind.ended,
   };
   return (kind, Uint8List.fromList(utf8.encode(jsonEncode(json))));
 }
@@ -71,20 +71,20 @@ void _journey(Map<String, Object?> json, JourneyPlacement journey) {
   }
 }
 
-String _why(Declined declined) => switch (declined) {
-  Unread() => 'unread',
-  NotAdmissible() => 'not-admissible',
-  Duplicate() => 'duplicate',
-  NotTakenIn() => 'not-taken-in',
-  NotATurn() => 'not-a-turn',
-  JudgedUnplaced() => 'judged-unplaced',
-  ChangesUnadmitted() => 'changes-unadmitted',
+String _why(EventDeclined declined) => switch (declined) {
+  NoReadingForSource() => 'no-reading-for-source',
+  ReadingFoundNothing() => 'reading-found-nothing',
+  DuplicateEvent() => 'duplicate-event',
+  ConversationNotTakenIn() => 'conversation-not-taken-in',
+  SaidStartsNoTurn() => 'said-starts-no-turn',
+  ShownMessageJudgedUnplaced() => 'shown-message-judged-unplaced',
+  ChangeToUnadmittedMessage() => 'change-to-unadmitted-message',
 };
 
 /// The entry of [kind] with [body], read back as the decision it holds.
 /// Null for anything [encodeDecision] doesn't write, an extra field
 /// included: it is our own wire, read strictly.
-Decision? decodeDecision(Kind kind, Uint8List body) {
+AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
   final Object? json;
   try {
     json = jsonDecode(utf8.decode(body));
@@ -95,12 +95,12 @@ Decision? decodeDecision(Kind kind, Uint8List body) {
   final event = _read(json['event'], EntryHash.parse);
   final by = _read(json['by'], _decidedBy);
   if (event == null || by == null) return null;
-  if (kind == DecisionKind.admitted) return _admitted(event, by, json);
-  if (kind == DecisionKind.declined) return _declined(event, by, json);
-  if (kind == DecisionKind.ended) {
+  if (kind == DecisionEntryKind.admitted) return _admitted(event, by, json);
+  if (kind == DecisionEntryKind.declined) return _declined(event, by, json);
+  if (kind == DecisionEntryKind.ended) {
     final journey = _read(json['journey'], JourneyId.parse);
     if (journey == null || json.length != 3) return null;
-    return Ended(event, by: by, journey: journey);
+    return JourneyEnded(event, by: by, journey: journey);
   }
   return null;
 }
@@ -108,8 +108,12 @@ Decision? decodeDecision(Kind kind, Uint8List body) {
 /// The [DecidedBy] named [name]; null for any other name.
 DecidedBy? _decidedBy(String name) => DecidedBy.values.asNameMap()[name];
 
-Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
-  final Admissible reading;
+EventAdmitted? _admitted(
+  EntryHash event,
+  DecidedBy by,
+  Map<String, Object?> json,
+) {
+  final AdmissibleEvent reading;
   try {
     reading = decodeReading(
       JsonObject.parse(json['reading']) ??
@@ -120,12 +124,12 @@ Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
   }
   final fields = {'event', 'by', 'reading'};
 
-  final Placement placement;
+  final AdmittedPlacement placement;
   if (json.containsKey('journeyPath')) {
     final path = _read(json['journeyPath'], JourneyPathId.parse);
     if (path == null) return null;
     fields.add('journeyPath');
-    placement = Under(path);
+    placement = UnderJourneyPath(path);
   } else {
     final journey = _readJourney(json, fields);
     if (journey == null) return null;
@@ -144,8 +148,8 @@ Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
     fields.add('rules');
   }
   if (json.length != fields.length) return null;
-  if ((rules != null) != Admitted.starts(placement)) return null;
-  return Admitted(
+  if ((rules != null) != EventAdmitted.starts(placement)) return null;
+  return EventAdmitted(
     event,
     by: by,
     reading: reading,
@@ -169,55 +173,61 @@ JourneyPlacement? _readJourney(Map<String, Object?> json, Set<String> fields) {
   return const StartsJourney();
 }
 
-Declined? _declined(EntryHash event, DecidedBy by, Map<String, Object?> json) {
+EventDeclined? _declined(
+  EntryHash event,
+  DecidedBy by,
+  Map<String, Object?> json,
+) {
   final why = json['why'];
   if (why is! String) return null;
-  if (why == 'unread' || why == 'not-admissible') {
+  if (why == 'no-reading-for-source' || why == 'reading-found-nothing') {
     if (json.length != 3) return null;
-    return why == 'unread'
-        ? Unread(event, by: by)
-        : NotAdmissible(event, by: by);
+    return why == 'no-reading-for-source'
+        ? NoReadingForSource(event, by: by)
+        : ReadingFoundNothing(event, by: by);
   }
-  final conversation = _read(json['conversation'], Conversation.parse);
+  final conversation = _read(json['conversation'], ConversationId.parse);
   final key = _read(json['key'], EventKey.parse);
   if (conversation == null || key == null) return null;
   switch (why) {
-    case 'duplicate':
+    case 'duplicate-event':
       final of = _read(json['of'], EntryHash.parse);
       if (of == null || json.length != 6) return null;
-      return Duplicate(
+      return DuplicateEvent(
         event,
         by: by,
         conversation: conversation,
         key: key,
         of: of,
       );
-    case 'changes-unadmitted':
+    case 'change-to-unadmitted-message':
       final message = _read(json['message'], SourceMessageId.parse);
       if (message == null || json.length != 6) return null;
-      return ChangesUnadmitted(
+      return ChangeToUnadmittedMessage(
         event,
         by: by,
         conversation: conversation,
         key: key,
         message: message,
       );
-    case 'not-taken-in' || 'not-a-turn' || 'judged-unplaced':
+    case 'conversation-not-taken-in' ||
+        'said-starts-no-turn' ||
+        'shown-message-judged-unplaced':
       if (json.length != 5) return null;
       return switch (why) {
-        'not-taken-in' => NotTakenIn(
+        'conversation-not-taken-in' => ConversationNotTakenIn(
           event,
           by: by,
           conversation: conversation,
           key: key,
         ),
-        'not-a-turn' => NotATurn(
+        'said-starts-no-turn' => SaidStartsNoTurn(
           event,
           by: by,
           conversation: conversation,
           key: key,
         ),
-        _ => JudgedUnplaced(
+        _ => ShownMessageJudgedUnplaced(
           event,
           by: by,
           conversation: conversation,

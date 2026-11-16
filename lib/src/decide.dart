@@ -15,7 +15,7 @@ import 'rules.dart';
 /// far. [reading] is null when no reading takes the event's source, or its
 /// body is not what a relay records.
 ///
-/// In order: an event whose key was decided already is a [Duplicate]. A
+/// In order: an event whose key was decided already is a [DuplicateEvent]. A
 /// change goes where the message it changes went, and a verdict under its
 /// conversation's journey path. A join goes into its journey, and
 /// something said under its conversation's journey path, or a new one
@@ -24,26 +24,26 @@ import 'rules.dart';
 ///
 /// Every decision it makes is [DecidedBy.rules]: nothing here asks the
 /// person.
-Decision decide(
+AdmissionDecision decide(
   EntryHash event,
-  Reading? reading,
-  Decided decided, {
+  EventReading? reading,
+  DecidedSoFar decided, {
   required JourneyRule journeys,
   required TurnRule turns,
 }) {
   const by = DecidedBy.rules;
-  final Admissible admissible;
+  final AdmissibleEvent admissible;
   switch (reading) {
     case null:
-      return Unread(event, by: by);
+      return NoReadingForSource(event, by: by);
     case NothingToAdmit():
-      return NotAdmissible(event, by: by);
-    case Admissible():
+      return ReadingFoundNothing(event, by: by);
+    case AdmissibleEvent():
       admissible = reading;
   }
-  final Admissible(:conversation, :key) = admissible;
+  final AdmissibleEvent(:conversation, :key) = admissible;
   if (decided.decidedAt(conversation, key) case final first?) {
-    return Duplicate(
+    return DuplicateEvent(
       event,
       by: by,
       conversation: conversation,
@@ -52,19 +52,20 @@ Decision decide(
     );
   }
 
-  Admitted admit(Placement placement, [JsonObject? rules]) => Admitted(
-    event,
-    by: by,
-    reading: admissible,
-    placement: placement,
-    rules: rules,
-  );
+  EventAdmitted admit(AdmittedPlacement placement, [JsonObject? rules]) =>
+      EventAdmitted(
+        event,
+        by: by,
+        reading: admissible,
+        placement: placement,
+        rules: rules,
+      );
 
   switch (admissible) {
-    case Changed(:final message):
+    case MessageChanged(:final message):
       return switch (decided.journeyPathOfMessage(conversation, message)) {
-        final path? => admit(Under(path)),
-        null => ChangesUnadmitted(
+        final path? => admit(UnderJourneyPath(path)),
+        null => ChangeToUnadmittedMessage(
           event,
           by: by,
           conversation: conversation,
@@ -72,37 +73,52 @@ Decision decide(
           message: message,
         ),
       };
-    case Judged():
+    case ShownMessageJudged():
       return switch (decided.journeyPathOf(conversation)) {
-        final path? => admit(Under(path)),
-        null => JudgedUnplaced(
+        final path? => admit(UnderJourneyPath(path)),
+        null => ShownMessageJudgedUnplaced(
           event,
           by: by,
           conversation: conversation,
           key: key,
         ),
       };
-    case Joined():
+    case ConversationJoined():
       return switch (_journey(admissible, decided, journeys)) {
         (InJourney() && final journey, _) => admit(IntoJourney(journey)),
         (final journey, final rules) => admit(IntoJourney(journey), rules),
-        null => NotTakenIn(event, by: by, conversation: conversation, key: key),
+        null => ConversationNotTakenIn(
+          event,
+          by: by,
+          conversation: conversation,
+          key: key,
+        ),
       };
-    case Said():
-      final Placement placement;
+    case MessageSaid():
+      final AdmittedPlacement placement;
       JsonObject? rules;
       if (decided.journeyPathOf(conversation) case final path?) {
-        placement = Under(path);
+        placement = UnderJourneyPath(path);
       } else if (_journey(admissible, decided, journeys)
           case (final journey, final journeyRules)?) {
         placement = StartsJourneyPath(journey);
         rules = journeyRules;
       } else {
-        return NotTakenIn(event, by: by, conversation: conversation, key: key);
+        return ConversationNotTakenIn(
+          event,
+          by: by,
+          conversation: conversation,
+          key: key,
+        );
       }
       return turns.startsTurn(admissible, placement)
           ? admit(placement, rules)
-          : NotATurn(event, by: by, conversation: conversation, key: key);
+          : SaidStartsNoTurn(
+              event,
+              by: by,
+              conversation: conversation,
+              key: key,
+            );
   }
 }
 
@@ -111,8 +127,8 @@ Decision decide(
 /// nothing) when that has started; a new one when [rule] takes it in; null
 /// when it doesn't.
 (JourneyPlacement, JsonObject)? _journey(
-  Admissible first,
-  Decided decided,
+  AdmissibleEvent first,
+  DecidedSoFar decided,
   JourneyRule rule,
 ) => switch (decided.journeyOf(first.within ?? first.conversation)) {
   final journey? => (InJourney(journey), decided.rulesOf(journey)),

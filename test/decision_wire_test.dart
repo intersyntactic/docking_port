@@ -18,13 +18,13 @@ import 'package:test/test.dart';
 
 final _a = 'a' * 64, _b = 'b' * 64, _c = 'c' * 64;
 final event = EntryHash.parse(_a)!;
-final conversation = Conversation.parse('teams:19:x;messageid=1')!;
-final within = Conversation.parse('teams:19:x')!;
+final conversation = ConversationId.parse('teams:19:x;messageid=1')!;
+final within = ConversationId.parse('teams:19:x')!;
 final key = EventKey.parse('message:1')!;
 final from = ActorId.parse('teams:t/p')!;
 final message = SourceMessageId.parse('19:x;messageid=1|1')!;
 
-final said = Said(
+final said = MessageSaid(
   conversation: conversation,
   within: within,
   key: key,
@@ -32,9 +32,9 @@ final said = Said(
 );
 
 /// One reading of each case, each reading back as itself.
-final readings = <Admissible>[
+final readings = <AdmissibleEvent>[
   said,
-  Changed(
+  MessageChanged(
     conversation: conversation,
     within: within,
     from: from,
@@ -42,7 +42,7 @@ final readings = <Admissible>[
     message: message,
     change: const Edited(text: 'hello'),
   ),
-  Changed(
+  MessageChanged(
     conversation: conversation,
     within: null,
     from: null,
@@ -50,14 +50,14 @@ final readings = <Admissible>[
     message: message,
     change: const Deleted(),
   ),
-  Joined.of(
+  ConversationJoined.of(
     conversation: within,
     within: null,
     from: from,
     key: key,
     joiners: [from, ActorId.parse('teams:bot')!],
   )!,
-  Judged(
+  ShownMessageJudged(
     conversation: conversation,
     within: within,
     from: from,
@@ -69,13 +69,14 @@ final readings = <Admissible>[
 
 const rules = JsonObject.of({'tools': 'all'});
 
-Admitted _admitted(Placement placement, DecidedBy by) => Admitted(
-  event,
-  by: by,
-  reading: said,
-  placement: placement,
-  rules: Admitted.starts(placement) ? rules : null,
-);
+EventAdmitted _admitted(AdmittedPlacement placement, DecidedBy by) =>
+    EventAdmitted(
+      event,
+      by: by,
+      reading: said,
+      placement: placement,
+      rules: EventAdmitted.starts(placement) ? rules : null,
+    );
 
 String _text((Kind, Uint8List) entry) => utf8.decode(entry.$2);
 
@@ -84,10 +85,10 @@ void main() {
     final entry = encodeDecision(
       _admitted(const StartsJourneyPath(StartsJourney()), DecidedBy.rules),
     );
-    expect(entry.$1, DecisionKind.admitted);
+    expect(entry.$1, DecisionEntryKind.admitted);
     expect(
       _text(entry),
-      '{"event":"$_a","by":"rules","reading":{"case":"said",'
+      '{"event":"$_a","by":"rules","reading":{"case":"message-said",'
       '"conversation":"teams:19:x;messageid=1","within":"teams:19:x",'
       '"key":"message:1","node":{"shape":"UserSaid","author":"teams:t/p",'
       '"source":"19:x;messageid=1|1","text":"hi"}},'
@@ -98,7 +99,7 @@ void main() {
 
   test('a duplicate', () {
     final entry = encodeDecision(
-      Duplicate(
+      DuplicateEvent(
         event,
         by: DecidedBy.rules,
         conversation: conversation,
@@ -106,10 +107,10 @@ void main() {
         of: EntryHash.parse(_b)!,
       ),
     );
-    expect(entry.$1, DecisionKind.declined);
+    expect(entry.$1, DecisionEntryKind.declined);
     expect(
       _text(entry),
-      '{"event":"$_a","by":"rules","why":"duplicate",'
+      '{"event":"$_a","by":"rules","why":"duplicate-event",'
       '"conversation":"teams:19:x;messageid=1","key":"message:1","of":"$_b"}',
     );
   });
@@ -118,33 +119,48 @@ void main() {
     final journey = JourneyId.parse(_b)!;
     final path = JourneyPathId.parse(_c)!;
     for (final by in DecidedBy.values) {
-      final decisions = <Decision>[
-        _admitted(Under(path), by),
+      final decisions = <AdmissionDecision>[
+        _admitted(UnderJourneyPath(path), by),
         _admitted(StartsJourneyPath(InJourney(journey)), by),
         _admitted(const StartsJourneyPath(StartsJourney()), by),
         for (final reading in readings)
-          Admitted(event, by: by, reading: reading, placement: Under(path)),
-        Admitted(
+          EventAdmitted(
+            event,
+            by: by,
+            reading: reading,
+            placement: UnderJourneyPath(path),
+          ),
+        EventAdmitted(
           event,
           by: by,
           reading: readings[3],
           placement: IntoJourney(InJourney(journey)),
         ),
         _admitted(const IntoJourney(StartsJourney()), by),
-        Ended(event, by: by, journey: journey),
-        Unread(event, by: by),
-        NotAdmissible(event, by: by),
-        Duplicate(
+        JourneyEnded(event, by: by, journey: journey),
+        NoReadingForSource(event, by: by),
+        ReadingFoundNothing(event, by: by),
+        DuplicateEvent(
           event,
           by: by,
           conversation: conversation,
           key: key,
           of: event,
         ),
-        NotTakenIn(event, by: by, conversation: conversation, key: key),
-        NotATurn(event, by: by, conversation: conversation, key: key),
-        JudgedUnplaced(event, by: by, conversation: conversation, key: key),
-        ChangesUnadmitted(
+        ConversationNotTakenIn(
+          event,
+          by: by,
+          conversation: conversation,
+          key: key,
+        ),
+        SaidStartsNoTurn(event, by: by, conversation: conversation, key: key),
+        ShownMessageJudgedUnplaced(
+          event,
+          by: by,
+          conversation: conversation,
+          key: key,
+        ),
+        ChangeToUnadmittedMessage(
           event,
           by: by,
           conversation: conversation,
@@ -166,7 +182,7 @@ void main() {
     Uint8List bytes(Map<String, Object?> json) =>
         Uint8List.fromList(utf8.encode(jsonEncode(json)));
     final reading = {
-      'case': 'said',
+      'case': 'message-said',
       'conversation': 'teams:c',
       'key': 'k',
       'node': {
@@ -182,49 +198,49 @@ void main() {
       'reading': reading,
       'journeyPath': _c,
     };
-    expect(decodeDecision(DecisionKind.admitted, bytes(good)), isNotNull);
+    expect(decodeDecision(DecisionEntryKind.admitted, bytes(good)), isNotNull);
     final bad = <(Kind, Map<String, Object?>)>[
-      (DecisionKind.declined, good),
-      (DecisionKind.admitted, {...good, 'extra': 1}),
-      (DecisionKind.admitted, {...good}..remove('reading')),
-      (DecisionKind.admitted, {...good, 'reading': 'said'}),
+      (DecisionEntryKind.declined, good),
+      (DecisionEntryKind.admitted, {...good, 'extra': 1}),
+      (DecisionEntryKind.admitted, {...good}..remove('reading')),
+      (DecisionEntryKind.admitted, {...good, 'reading': 'message-said'}),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {...reading, 'extra': 1},
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {...reading}..remove('key'),
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {...reading, 'case': 'x'},
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {...reading, 'from': 'teams:p'},
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {...reading, 'within': null},
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {
@@ -234,11 +250,11 @@ void main() {
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {
-            'case': 'joined',
+            'case': 'conversation-joined',
             'conversation': 'teams:c',
             'key': 'k',
             'joiners': <String>[],
@@ -246,11 +262,11 @@ void main() {
         },
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {
           ...good,
           'reading': {
-            'case': 'judged',
+            'case': 'shown-message-judged',
             'conversation': 'teams:c',
             'key': 'k',
             'to': 'c|1',
@@ -258,41 +274,52 @@ void main() {
           },
         },
       ),
-      (DecisionKind.admitted, {...good, 'conversation': 'teams:c'}),
-      (DecisionKind.admitted, {...good}..remove('by')),
-      (DecisionKind.admitted, {...good, 'by': 'nick'}),
-      (DecisionKind.admitted, {...good, 'by': null}),
-      (DecisionKind.admitted, {...good, 'event': 'nothex'}),
-      (DecisionKind.admitted, {...good, 'journey': _b}),
+      (DecisionEntryKind.admitted, {...good, 'conversation': 'teams:c'}),
+      (DecisionEntryKind.admitted, {...good}..remove('by')),
+      (DecisionEntryKind.admitted, {...good, 'by': 'nick'}),
+      (DecisionEntryKind.admitted, {...good, 'by': null}),
+      (DecisionEntryKind.admitted, {...good, 'event': 'nothex'}),
+      (DecisionEntryKind.admitted, {...good, 'journey': _b}),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {...good}
           ..remove('journeyPath')
           ..addAll({'journey': _b, 'startsJourney': true}),
       ),
       (
-        DecisionKind.admitted,
+        DecisionEntryKind.admitted,
         {...good}
           ..remove('journeyPath')
           ..addAll({'startsJourneyPath': false, 'journey': _b}),
       ),
       (
-        DecisionKind.declined,
-        {'event': _a, 'by': 'rules', 'why': 'unread', 'key': 'k'},
+        DecisionEntryKind.declined,
+        {
+          'event': _a,
+          'by': 'rules',
+          'why': 'no-reading-for-source',
+          'key': 'k',
+        },
       ),
       (
-        DecisionKind.declined,
+        DecisionEntryKind.declined,
         {'event': _a, 'by': 'rules', 'why': 'never-heard-of-it'},
       ),
-      (DecisionKind.declined, {'event': _a, 'why': 'unread'}),
-      (DecisionKind.ended, {'event': _a, 'by': 'rules'}),
-      (DecisionKind.ended, {'event': _a, 'by': 'rules', 'journey': 'x'}),
       (
-        DecisionKind.ended,
+        DecisionEntryKind.declined,
+        {'event': _a, 'why': 'no-reading-for-source'},
+      ),
+      (DecisionEntryKind.ended, {'event': _a, 'by': 'rules'}),
+      (DecisionEntryKind.ended, {'event': _a, 'by': 'rules', 'journey': 'x'}),
+      (
+        DecisionEntryKind.ended,
         {'event': _a, 'by': 'rules', 'journey': _b, 'why': 'done'},
       ),
-      (DecisionKind.admitted, {'event': _a, 'by': 'rules', 'journey': _b}),
-      (Kind.parse('event')!, {'event': _a, 'by': 'rules', 'why': 'unread'}),
+      (DecisionEntryKind.admitted, {'event': _a, 'by': 'rules', 'journey': _b}),
+      (
+        Kind.parse('event')!,
+        {'event': _a, 'by': 'rules', 'why': 'no-reading-for-source'},
+      ),
     ];
     for (final (kind, json) in bad) {
       expect(decodeDecision(kind, bytes(json)), isNull, reason: '$json');
@@ -303,7 +330,10 @@ void main() {
       'startsJourney': true,
       'rules': {'tools': 'all'},
     }..remove('journeyPath');
-    expect(decodeDecision(DecisionKind.admitted, bytes(starts)), isNotNull);
+    expect(
+      decodeDecision(DecisionEntryKind.admitted, bytes(starts)),
+      isNotNull,
+    );
     for (final json in [
       {
         ...good,
@@ -314,13 +344,13 @@ void main() {
       {...starts, 'rules': null},
     ]) {
       expect(
-        decodeDecision(DecisionKind.admitted, bytes(json)),
+        decodeDecision(DecisionEntryKind.admitted, bytes(json)),
         isNull,
         reason: '$json',
       );
     }
     expect(
-      decodeDecision(DecisionKind.admitted, Uint8List.fromList([0xff])),
+      decodeDecision(DecisionEntryKind.admitted, Uint8List.fromList([0xff])),
       isNull,
     );
   });

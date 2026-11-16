@@ -29,7 +29,7 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 /// It follows the record from its start, asking [follow] for its events
 /// and its `admitted` and `declined` entries. Each event is read by the
 /// one of [readings] for its source, in the record's order, and each
-/// decision is taken into a [Decided]. Once [follow] has caught up, each
+/// decision is taken into a [DecidedSoFar]. Once [follow] has caught up, each
 /// event with no decision is decided under [journeys] and [turns], in
 /// order, and sent with [send] following the decision before it; so is
 /// each event after that, as it comes.
@@ -65,10 +65,10 @@ Future<void> runDockingStation({
     }
     folds[reading.source] = _Fold(reading);
   }
-  final decided = Decided();
+  final decided = DecidedSoFar();
   // Each event read but not yet decided, with its reading, in the record's
   // order.
-  final waiting = <EntryHash, Reading?>{};
+  final waiting = <EntryHash, EventReading?>{};
 
   // Decides each waiting event in order. Returns early when another
   // docking station has decided first: its decisions come on the record.
@@ -97,12 +97,12 @@ Future<void> runDockingStation({
   }
 
   var caughtUp = false;
-  final kinds = {..._eventKinds, ...DecisionKind.all};
+  final kinds = {..._eventKinds, ...DecisionEntryKind.all};
   await for (final item in follow(kinds)) {
     switch (item) {
       case JournalEntryFrame(:final hash, :final kind)
           when _eventKinds.contains(kind):
-        final event = Event.read(hash, item.body);
+        final event = RelayedEvent.read(hash, item.body);
         waiting[hash] = switch (event) {
           final event? => folds[event.source]?.step(event),
           null => null,
@@ -128,7 +128,7 @@ final class _Fold<S> {
   final ModuleReading<S> _reading;
   S _state;
 
-  Reading step(Event event) {
+  EventReading step(RelayedEvent event) {
     final (state, reading) = _reading.step(_state, event);
     _state = state;
     return reading;

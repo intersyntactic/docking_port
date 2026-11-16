@@ -1,4 +1,4 @@
-// What [decide] makes of events against what [Decided] holds, without a
+// What [decide] makes of events against what [DecidedSoFar] holds, without a
 // record: the questions one decision asks of the ones before it.
 import 'dart:convert';
 
@@ -12,10 +12,11 @@ import 'package:test/test.dart';
 
 final class _All implements JourneyRule, TurnRule {
   @override
-  JsonObject takeIn(Admissible first) => const JsonObject.of({'tools': 'all'});
+  JsonObject takeIn(AdmissibleEvent first) =>
+      const JsonObject.of({'tools': 'all'});
 
   @override
-  bool startsTurn(Said said, Placement placement) => true;
+  bool startsTurn(MessageSaid said, AdmittedPlacement placement) => true;
 }
 
 EntryHash _hash(String s) => EntryHash.of(utf8.encode(s));
@@ -23,8 +24,8 @@ EntryHash _hash(String s) => EntryHash.of(utf8.encode(s));
 void main() {
   test('every duplicate names the first event with its key, not the copy '
       'before it', () {
-    final said = Said(
-      conversation: Conversation.parse('test:chat')!,
+    final said = MessageSaid(
+      conversation: ConversationId.parse('test:chat')!,
       within: null,
       key: EventKey.parse('message:1')!,
       node: UserSaid(
@@ -33,7 +34,7 @@ void main() {
         text: 'hello',
       ),
     );
-    final decided = Decided();
+    final decided = DecidedSoFar();
     final events = [for (final name in 'ABCD'.split('')) _hash(name)];
     final ofs = <EntryHash>[];
     for (final (i, event) in events.indexed) {
@@ -44,7 +45,7 @@ void main() {
         journeys: _All(),
         turns: _All(),
       );
-      if (decision case Duplicate(:final of)) ofs.add(of);
+      if (decision case DuplicateEvent(:final of)) ofs.add(of);
       decided.take(_hash('decision $i'), decision);
     }
     // A third copy is where naming the copy before shows: two copies name
@@ -54,9 +55,9 @@ void main() {
 
   test('a path started in a journey already taken in records the rules '
       'the journey was taken in under, without asking the rule again', () {
-    final channel = Conversation.parse('test:channel')!;
-    Said said(String thread, String key) => Said(
-      conversation: Conversation.parse('test:channel;$thread')!,
+    final channel = ConversationId.parse('test:channel')!;
+    MessageSaid said(String thread, String key) => MessageSaid(
+      conversation: ConversationId.parse('test:channel;$thread')!,
       within: channel,
       key: EventKey.parse(key)!,
       node: UserSaid(
@@ -66,7 +67,7 @@ void main() {
       ),
     );
     final rule = _Counting();
-    final decided = Decided();
+    final decided = DecidedSoFar();
     final first = decide(
       _hash('A'),
       said('t1', 'a'),
@@ -83,8 +84,8 @@ void main() {
       turns: _All(),
     );
     expect(rule.asked, 1);
-    expect((first as Admitted).placement, isA<StartsJourneyPath>());
-    final placement = (second as Admitted).placement;
+    expect((first as EventAdmitted).placement, isA<StartsJourneyPath>());
+    final placement = (second as EventAdmitted).placement;
     expect(
       placement,
       isA<StartsJourneyPath>().having(
@@ -102,9 +103,9 @@ void main() {
 
   test('after a journey ends, its conversation starts a new path in the '
       'same journey, under the same rules', () {
-    final channel = Conversation.parse('test:channel')!;
-    Said said(String key) => Said(
-      conversation: Conversation.parse('test:channel;t1')!,
+    final channel = ConversationId.parse('test:channel')!;
+    MessageSaid said(String key) => MessageSaid(
+      conversation: ConversationId.parse('test:channel;t1')!,
       within: channel,
       key: EventKey.parse(key)!,
       node: UserSaid(
@@ -114,8 +115,8 @@ void main() {
       ),
     );
     final rule = _Counting();
-    final decided = Decided();
-    Decision step(String key) {
+    final decided = DecidedSoFar();
+    AdmissionDecision step(String key) {
       final decision = decide(
         _hash(key),
         said(key),
@@ -127,17 +128,25 @@ void main() {
       return decision;
     }
 
-    final first = step('a') as Admitted;
+    final first = step('a') as EventAdmitted;
     final journey = JourneyId.parse(_hash('decision a').hex)!;
     expect(
       step('b'),
-      isA<Admitted>().having((a) => a.placement, 'placement', isA<Under>()),
+      isA<EventAdmitted>().having(
+        (a) => a.placement,
+        'placement',
+        isA<UnderJourneyPath>(),
+      ),
     );
     decided.take(
       _hash('end'),
-      Ended(_hash('asked to end'), by: DecidedBy.person, journey: journey),
+      JourneyEnded(
+        _hash('asked to end'),
+        by: DecidedBy.person,
+        journey: journey,
+      ),
     );
-    final again = step('c') as Admitted;
+    final again = step('c') as EventAdmitted;
     expect(
       again.placement,
       isA<StartsJourneyPath>().having(
@@ -157,5 +166,5 @@ final class _Counting implements JourneyRule {
   var asked = 0;
 
   @override
-  JsonObject takeIn(Admissible first) => JsonObject.of({'asked': ++asked});
+  JsonObject takeIn(AdmissibleEvent first) => JsonObject.of({'asked': ++asked});
 }

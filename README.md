@@ -57,32 +57,31 @@ For each event, the reading names:
 
 ## The cases
 
-- **Said** (`Said`): something said. It carries the `UserSaid` the journey
-  path appends, because only the reading holds what building one takes, such
-  as a quote's author from earlier events. Something said always names who
-  said it, since a `UserSaid` must have an author. So a message the module
-  can't attribute is *nothing to admit*, never admitted unattributed.
-- **Changed** (`Changed`): an edit, delete or restore of an earlier message,
-  in the message's terms, carrying what the message became as
-  conversation_shapes' `WhatChanged`: `Edited` (what it says now), `Deleted`
-  or `Restored`. The journey path's agent loop makes the node for it, a
+- **Message said** (`MessageSaid`): something said. It carries the `UserSaid`
+  the journey path appends, because only the reading holds what building one
+  takes, such as a quote's author from earlier events. Something said always
+  names who said it, since a `UserSaid` must have an author. So a message the
+  module can't attribute is *nothing to admit*, never admitted unattributed.
+- **Message changed** (`MessageChanged`): an edit, delete or restore of an
+  earlier message, in the message's terms, carrying what the message became as
+  conversation_shapes' `WhatChanged`: `Edited` (what it says now), `Deleted` or
+  `Restored`. The journey path's agent loop makes the node for it, a
   `UserSaidChanged`, because that node points at the turn the message became,
   and only the loop knows that turn. A module never learns turns. A change
   counts only when it comes from whoever said the message (Nick, 16 Nov), and
   whatever reads it applies that, so the docking station admits it whoever made
   it.
-- **Joined** (`Joined`): people or the agent joined a conversation. Never
-  empty: a join of no one is nothing to admit.
-- **Judged** (`Judged`): a person's verdict on something the agent showed
-  them, such as Approve, Not yet or a proposed correction on a card. It is
-  named for what it says, not for the button: a Slack button would be the
-  same thing. It names the message judged, and the verdict as
-  is_annotation_shapes' `VerdictOnShownMessage`: `ApprovedVerdict`,
-  `HeldOffVerdict` or `ProposedCorrectionVerdict`. As with a change, the
-  journey path's agent loop builds the annotation (a `NodeApproval`, a
-  `NodeSeenMark`, a `NodeCorrection`) once it knows which turn the message
-  showed. A verdict always names who gave it, since a verdict from no one
-  approves nothing.
+- **Conversation joined** (`ConversationJoined`): people or the agent joined a
+  conversation. Never empty: a join of no one is nothing to admit.
+- **Shown message judged** (`ShownMessageJudged`): a person's verdict on
+  something the agent showed them, such as Approve, Not yet or a proposed
+  correction on a card. It is named for what it says, not for the button: a
+  Slack button would be the same thing. It names the message judged, and the
+  verdict as is_annotation_shapes' `VerdictOnShownMessage`: `ApprovedVerdict`,
+  `HeldOffVerdict` or `ProposedCorrectionVerdict`. As with a change, the journey
+  path's agent loop builds the annotation (a `NodeApproval`, a `NodeSeenMark`, a
+  `NodeCorrection`) once it knows which turn the message showed. A verdict
+  always names who gave it, since a verdict from no one approves nothing.
 - **Nothing to admit** (`NothingToAdmit`): a typing indicator, a reaction the
   module doesn't carry, anything it can't read.
 
@@ -112,8 +111,8 @@ uses the same one.
 
 ## Where it stands
 
-- **Built:** the reading contract: `Event`, `ModuleReading`, `Reading` and its
-  cases, `Conversation`, `EventKey`.
+- **Built:** the reading contract: `RelayedEvent`, `ModuleReading`,
+  `EventReading` and its cases, `ConversationId`, `EventKey`.
 - **Proposed, not agreed:** admission, meaning the decision recorded for each
   event, the rules passed in, and rebuilding from the record
   (https://github.com/intersyntactic/docking_station/pull/2,
