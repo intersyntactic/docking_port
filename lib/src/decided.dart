@@ -12,21 +12,22 @@ import 'package:is_shapes/is_shapes.dart' show JourneyId, JourneyPathId;
 import 'decision.dart';
 import 'reading.dart';
 
-/// Every decision so far, as the questions deciding the next arrival asks.
+/// Every decision so far, as the questions deciding the next event asks.
 ///
-/// How it is used: the docking port follows `arrived`, `admitted` and
-/// `declined` from the record's start. It folds each arrival through its
-/// module's reading and [take]s each decision. At `caught-up` it decides,
-/// in order, each arrival that has no decision. Those are only ever the
-/// last few, because it records each decision before deciding the next.
-/// Then it decides each new arrival as it comes. Each decision is sent
-/// following [tip]. A refusal means another docking port decided first,
-/// and its decision arrives to be taken like any other.
+/// How it is used: the docking port follows the record's events and its
+/// own `admitted` and `declined` entries from the record's start. It folds
+/// each event through its module's reading and [take]s each decision. At
+/// `caught-up` it decides, in order, each event that has no decision.
+/// Those are only ever the last few, because it records each decision
+/// before deciding the next. Then it decides each new event as it comes.
+/// Each decision is sent following [tip]. A refusal means another docking
+/// port decided first, and its decision comes on the record to be taken
+/// like any other.
 final class Decided {
   EntryHash? _tip;
   final _taken = <EntryHash>{};
-  final _arrivals = <EntryHash>{};
-  final _events = <(Conversation, ArrivalKey), EntryHash>{};
+  final _decidedEvents = <EntryHash>{};
+  final _events = <(Conversation, EventKey), EntryHash>{};
   final _journeyPaths = <Conversation, JourneyPathId>{};
   final _journeys = <Conversation, JourneyId>{};
   final _messages = <(Conversation, SourceMessageId), JourneyPathId>{};
@@ -34,12 +35,12 @@ final class Decided {
   /// The last decision: what the next one follows. Null before the first.
   EntryHash? get tip => _tip;
 
-  /// Whether [arrival] has been decided.
-  bool has(EntryHash arrival) => _arrivals.contains(arrival);
+  /// Whether [event] has been decided.
+  bool has(EntryHash event) => _decidedEvents.contains(event);
 
-  /// The arrival the event [key] in [conversation] was decided at, either
-  /// way. Null when it hasn't been.
-  EntryHash? decidedAt(Conversation conversation, ArrivalKey key) =>
+  /// The event that [key] in [conversation] was decided at, whichever way
+  /// it went. Null when no event with that key has been decided.
+  EntryHash? decidedAt(Conversation conversation, EventKey key) =>
       _events[(conversation, key)];
 
   /// The journey path [conversation] is under. Null when it is under none
@@ -68,12 +69,12 @@ final class Decided {
   void take(EntryHash entry, Decision decision) {
     if (!_taken.add(entry)) return;
     _tip = entry;
-    _arrivals.add(decision.arrival);
+    _decidedEvents.add(decision.event);
     switch (decision) {
       case Admitted():
         _admit(entry, decision);
-      case DeclinedEvent(:final conversation, :final key, :final arrival):
-        _events[(conversation, key)] = arrival;
+      case DeclinedEvent(:final conversation, :final key, :final event):
+        _events[(conversation, key)] = event;
       case Unread() || NotAdmissible():
         break;
     }
@@ -81,7 +82,7 @@ final class Decided {
 
   void _admit(EntryHash entry, Admitted admitted) {
     final Admitted(:conversation, :key, :message) = admitted;
-    _events[(conversation, key)] = admitted.arrival;
+    _events[(conversation, key)] = admitted.event;
     final outside = admitted.within ?? conversation;
 
     void journey(JourneyPlacement placement) {

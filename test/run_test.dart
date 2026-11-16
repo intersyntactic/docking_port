@@ -63,12 +63,14 @@ final class _Record {
     return frame;
   }
 
-  /// An arrival from [source], whose bytes are [what] as JSON.
-  JournalEntryFrame arrive(
+  /// An event from [source], whose bytes are [what] as JSON, recorded as an
+  /// entry of [kind].
+  JournalEntryFrame recordEvent(
     Map<String, Object?> what, {
     String source = 'test',
+    String kind = 'event',
   }) => add(
-    'arrived',
+    kind,
     null,
     utf8.encode(
       jsonEncode({
@@ -116,9 +118,9 @@ final class _Record {
   }
 }
 
-/// Reads an arrival's bytes, `{"said": <text>, "key": <key>}`, as [ann]
+/// Reads an event's bytes, `{"said": <text>, "key": <key>}`, as [ann]
 /// saying it in [chat]; anything else as nothing to admit. Keeps which
-/// arrivals it was given, in order.
+/// events it was given, in order.
 final class _Reading implements ModuleReading<int> {
   final given = <EntryHash>[];
 
@@ -129,16 +131,16 @@ final class _Reading implements ModuleReading<int> {
   int get start => 0;
 
   @override
-  (int, Reading) step(int state, Arrival arrival) {
-    given.add(arrival.entry);
-    final what = jsonDecode(utf8.decode(arrival.bytes)) as Map<String, Object?>;
+  (int, Reading) step(int state, Event event) {
+    given.add(event.entry);
+    final what = jsonDecode(utf8.decode(event.bytes)) as Map<String, Object?>;
     if (what case {'said': final String text, 'key': final String key}) {
       return (
         state + 1,
         Said(
           conversation: chat,
           within: null,
-          key: ArrivalKey.parse(key)!,
+          key: EventKey.parse(key)!,
           node: UserSaid(
             author: ann,
             source: SourceMessageId.parse('chat|$key')!,
@@ -183,29 +185,29 @@ Future<void> _runToEnd(_Record record, _Reading reading) async {
   await running;
 }
 
-Admitted _startsChat(EntryHash arrival, String key) => Admitted(
-  arrival,
+Admitted _startsChat(EntryHash event, String key) => Admitted(
+  event,
   by: DecidedBy.rules,
   conversation: chat,
   within: null,
-  key: ArrivalKey.parse(key)!,
+  key: EventKey.parse(key)!,
   from: ann,
   message: SourceMessageId.parse('chat|$key')!,
   placement: const StartsJourneyPath(StartsJourney()),
 );
 
 void main() {
-  test('once caught up, decides each waiting arrival, each following the '
+  test('once caught up, decides each waiting event, each following the '
       'one before', () async {
     final record = _Record();
-    final a = record.arrive({'said': 'hello', 'key': 'a'});
-    final b = record.arrive({'said': 'again', 'key': 'b'});
+    final a = record.recordEvent({'said': 'hello', 'key': 'a'});
+    final b = record.recordEvent({'said': 'again', 'key': 'b'});
     await _runToEnd(record, _Reading());
 
     final [(firstFollows, first), (secondFollows, second)] = record.sent;
     final [firstEntry, _] = record.decisionEntries;
     expect(firstFollows, isNull);
-    expect(first.arrival, a.hash);
+    expect(first.event, a.hash);
     expect(first.by, DecidedBy.rules);
     expect(
       (first as Admitted).placement,
@@ -216,7 +218,7 @@ void main() {
       ),
     );
     expect(secondFollows, firstEntry);
-    expect(second.arrival, b.hash);
+    expect(second.event, b.hash);
     expect(
       ((second as Admitted).placement as Under).journeyPath.hex,
       firstEntry.hex,
@@ -224,70 +226,67 @@ void main() {
   });
 
   test('takes the decisions in the record, and decides only what is left, '
-      'reading every arrival', () async {
+      'reading every event', () async {
     final record = _Record();
     final reading = _Reading();
-    final a = record.arrive({'said': 'hello', 'key': 'a'});
+    final a = record.recordEvent({'said': 'hello', 'key': 'a'});
     record.decideElsewhere(_startsChat(a.hash, 'a'));
-    final b = record.arrive({'said': 'again', 'key': 'b'});
+    final b = record.recordEvent({'said': 'again', 'key': 'b'});
     await _runToEnd(record, reading);
 
     final aDecision = record.decisionEntries.first;
     final [(follows, decision)] = record.sent;
     expect(reading.given, [a.hash, b.hash]);
     expect(follows, aDecision);
-    expect(decision.arrival, b.hash);
+    expect(decision.event, b.hash);
     expect(
       ((decision as Admitted).placement as Under).journeyPath.hex,
       aDecision.hex,
     );
   });
 
-  test(
-    'decides an arrival that comes after catching up, as it comes',
-    () async {
-      final record = _Record();
-      final running = _run(record, _Reading());
-      await pumpEventQueue();
-      expect(record.sent, isEmpty);
+  test('decides an event that comes after catching up, as it comes', () async {
+    final record = _Record();
+    final running = _run(record, _Reading());
+    await pumpEventQueue();
+    expect(record.sent, isEmpty);
 
-      final c = record.arrive({'said': 'late', 'key': 'c'});
-      await pumpEventQueue();
-      await record.close();
-      await running;
+    final c = record.recordEvent({'said': 'late', 'key': 'c'});
+    await pumpEventQueue();
+    await record.close();
+    await running;
 
-      final [(_, decision)] = record.sent;
-      expect(decision.arrival, c.hash);
-      expect(record.decisions.map((d) => d.arrival), [c.hash]);
-    },
-  );
+    final [(_, decision)] = record.sent;
+    expect(decision.event, c.hash);
+    expect(record.decisions.map((d) => d.event), [c.hash]);
+  });
 
   test('when another docking port decided first, takes its decision and '
       'sends nothing more', () async {
     final record = _Record();
-    final a0 = record.arrive({'said': 'hello', 'key': 'a0'});
+    final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
     record.decideElsewhere(_startsChat(a0.hash, 'a0'));
-    final a = record.arrive({'said': 'again', 'key': 'a'});
+    final a = record.recordEvent({'said': 'again', 'key': 'a'});
     record.beforeNextSend = () => record.decideElsewhere(
       NotATurn(
         a.hash,
         by: DecidedBy.rules,
         conversation: chat,
-        key: ArrivalKey.parse('a')!,
+        key: EventKey.parse('a')!,
       ),
     );
     await _runToEnd(record, _Reading());
 
     expect(record.sent, hasLength(1));
-    expect(record.decisions.map((d) => d.arrival), [a0.hash, a.hash]);
+    expect(record.decisions.map((d) => d.event), [a0.hash, a.hash]);
     expect(record.decisions.last, isA<NotATurn>());
   });
 
   test('a refusal while the chain has not moved is rethrown', () async {
     final record = _Record();
-    final a0 = record.arrive({'said': 'hello', 'key': 'a0'});
+    final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
     record.decideElsewhere(_startsChat(a0.hash, 'a0'));
-    record.arrive({'said': 'again', 'key': 'a'});
+    record.recordEvent({'said': 'again', 'key': 'a'});
     record.refuse = 'docking-port may not send admitted';
 
     await expectLater(
@@ -306,18 +305,32 @@ void main() {
     await record.close();
   });
 
-  test(
-    'an arrival from a source no reading takes is declined, unread',
-    () async {
-      final record = _Record();
-      final x = record.arrive({'said': 'hi', 'key': 'x'}, source: 'elsewhere');
-      final reading = _Reading();
-      await _runToEnd(record, reading);
+  test('an event from a source no reading takes is declined, unread', () async {
+    final record = _Record();
+    final x = record.recordEvent({
+      'said': 'hi',
+      'key': 'x',
+    }, source: 'elsewhere');
+    final reading = _Reading();
+    await _runToEnd(record, reading);
 
-      final [(_, decision)] = record.sent;
-      expect(decision, isA<Unread>());
-      expect(decision.arrival, x.hash);
-      expect(reading.given, isEmpty);
-    },
-  );
+    final [(_, decision)] = record.sent;
+    expect(decision, isA<Unread>());
+    expect(decision.event, x.hash);
+    expect(reading.given, isEmpty);
+  });
+
+  test('reads an event recorded before the rename, as `arrived`', () async {
+    final record = _Record();
+    final reading = _Reading();
+    final old = record.recordEvent({
+      'said': 'hello',
+      'key': 'a',
+    }, kind: 'arrived');
+    final now = record.recordEvent({'said': 'again', 'key': 'b'});
+    await _runToEnd(record, reading);
+
+    expect(reading.given, [old.hash, now.hash]);
+    expect(record.decisions.map((d) => d.event), [old.hash, now.hash]);
+  });
 }
