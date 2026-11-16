@@ -21,5 +21,6 @@ export 'src/decided.dart';
 export 'src/decision.dart';
 export 'src/decision_wire.dart';
 export 'src/reading.dart';
+export 'src/reading_wire.dart';
 export 'src/rules.dart';
 export 'src/run.dart';

@@ -12,7 +12,8 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:is_annotation_shapes/is_annotation_shapes.dart' show Response;
+import 'package:is_annotation_shapes/is_annotation_shapes.dart'
+    show VerdictOnShownMessage;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid, WhatChanged;
 import 'package:is_journal/is_journal.dart' show EntryHash;
@@ -98,8 +99,8 @@ abstract interface class ModuleReading<S> {
 }
 
 /// What one event is: something said ([Said]), a change to an earlier
-/// message ([Changed]), a conversation joined ([Joined]), a response to
-/// something the agent showed ([Responded]), or nothing to admit
+/// message ([Changed]), a conversation joined ([Joined]), a person's verdict
+/// on something the agent showed ([Judged]), or nothing to admit
 /// ([NothingToAdmit]).
 sealed class Reading {
   const Reading();
@@ -232,32 +233,32 @@ final class Joined extends Admissible {
   }
 }
 
-/// A person's [response] to [to], something the agent showed them, such as
-/// Approve, Not yet or a proposed correction on a card (Nick, 2026-11-15).
-/// Named for what the person said, not for the button, so a Slack button
-/// reads the same.
+/// A person's [verdict] on [to], something the agent showed them, such as
+/// Approve, Not yet or a proposed correction on a card (Nick, 2026-11-15;
+/// named `Judged` 16 Nov). Named for what the person said, not for the
+/// button, so a Slack button reads the same.
 ///
 /// It names the message, never a turn: the journey path's apex builds the
-/// annotation, an `Approval`, a `Seen` or a `Correction`, once it knows
-/// which turn [to] showed. A response always names who responded, since a
-/// response from no one approves nothing.
-final class Responded extends Admissible {
-  const Responded({
+/// annotation, a `NodeApproval`, a `NodeSeenMark` or a `NodeCorrection`,
+/// once it knows which turn [to] showed. A verdict always names who gave it, since a
+/// verdict from no one approves nothing.
+final class Judged extends Admissible {
+  const Judged({
     required super.conversation,
     required super.within,
     required this.from,
     required super.key,
     required this.to,
-    required this.response,
+    required this.verdict,
   });
 
   @override
   final ActorId from;
 
-  /// The message responded to, such as the card, as it was sent.
+  /// The message judged, such as the card, as it was sent.
   final SourceMessageId to;
 
-  final Response response;
+  final VerdictOnShownMessage verdict;
 }
 
 /// An outside conversation: a Teams chat, channel or channel thread, a

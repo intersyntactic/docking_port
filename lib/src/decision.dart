@@ -25,6 +25,7 @@
 /// event now.
 library;
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
@@ -33,15 +34,22 @@ import 'package:is_shapes/is_shapes.dart'
     show ActorId, DecidedBy, JourneyId, JourneyPathId;
 
 import 'reading.dart';
+import 'rules.dart';
 
 /// The kinds of entry the docking station sends, one per event. Its user's
-/// row in the record's sender table allows these two and nothing else.
+/// row in the record's sender table allows these three and nothing else.
 abstract final class DecisionKind {
   /// An [Admitted]'s kind.
   static final admitted = Kind.parse('admitted')!;
 
   /// A [Declined]'s kind.
   static final declined = Kind.parse('declined')!;
+
+  /// An [Ended]'s kind.
+  static final ended = Kind.parse('ended')!;
+
+  /// Every kind above, as the docking station follows its own decisions.
+  static final all = {admitted, declined, ended};
 }
 
 /// Where an admitted event goes. Something said, or a change, goes
@@ -114,44 +122,90 @@ sealed class Decision {
   final DecidedBy by;
 }
 
-/// [event] admitted by [placement]: [key] in [conversation],
-/// which sits within [within], from [from], about [message].
+/// [event], read as [reading], admitted by [placement].
 ///
 /// The entry, of kind `admitted`:
 ///
-///     {"event": <hex>, "by": <who>, "conversation": <id>, "within": <id>?,
-///      "key": <key>, "from": <actor id>?, "message": <source>?,
-///      ...the placement}
+///     {"event": <hex>, "by": <who>, "reading": <reading>,
+///      ...the placement, "rules": <rules>?}
 ///
-/// The placement is `"journeyPath": <id>` for [Under];
-/// `"startsJourneyPath": true` and the journey for [StartsJourneyPath]; the
-/// journey alone for [IntoJourney]. The journey is `"journey": <id>` for
-/// [InJourney], or `"startsJourney": true` for [StartsJourney].
+/// `<reading>` is the whole reading, as [encodeReading] writes it (Nick,
+/// 16 Nov: the `admitted` entry carries the reading), so whatever hands the
+/// event to its journey path's apex reads the node from the decision, and
+/// never reads a module's bytes. The placement is `"journeyPath": <id>` for
+/// [Under]; `"startsJourneyPath": true` and the journey for
+/// [StartsJourneyPath]; the journey alone for [IntoJourney]. The journey is
+/// `"journey": <id>` for [InJourney], or `"startsJourney": true` for
+/// [StartsJourney].
 ///
-/// [within] is kept so which journey an outside conversation is can be
-/// rebuilt from decisions alone; [from], for rules about who starts turns,
-/// such as a cap on turns bots start.
+/// [rules] are there exactly when the admission starts a journey or a
+/// journey path: the rules the journey was taken in under, as the
+/// [JourneyRule] gave them, copied into each path it starts. loop_launcher
+/// reads a path's rules from the entry that started it, and the airlock
+/// enforces them; the docking station passes them through unread.
+///
+/// The reading's [within] is kept so which journey an outside conversation
+/// is can be rebuilt from decisions alone; its [from], for rules about who
+/// starts turns, such as a cap on turns bots start.
 final class Admitted extends Decision {
-  const Admitted(
+  /// Throws an [ArgumentError] when [rules] are given for an admission
+  /// that starts nothing, or missing for one that starts something.
+  Admitted(
     super.event, {
     required super.by,
-    required this.conversation,
-    required this.within,
-    required this.key,
-    required this.from,
-    required this.message,
+    required this.reading,
     required this.placement,
-  });
+    this.rules,
+  }) {
+    if ((rules != null) != starts(placement)) {
+      throw ArgumentError.value(
+        rules,
+        'rules',
+        'given exactly when the admission starts a journey or a path',
+      );
+    }
+  }
 
-  final Conversation conversation;
-  final Conversation? within;
-  final EventKey key;
-  final ActorId? from;
-
-  /// The message it says, changes or responds to; null for a join.
-  final SourceMessageId? message;
-
+  final Admissible reading;
   final Placement placement;
+  final JsonObject? rules;
+
+  /// Whether [placement] starts a journey path or a journey.
+  static bool starts(Placement placement) => switch (placement) {
+    StartsJourneyPath() || IntoJourney(journey: StartsJourney()) => true,
+    Under() || IntoJourney(journey: InJourney()) => false,
+  };
+
+  Conversation get conversation => reading.conversation;
+  Conversation? get within => reading.within;
+  EventKey get key => reading.key;
+  ActorId? get from => reading.from;
+
+  /// The message it says, changes or judges; null for a join.
+  SourceMessageId? get message => switch (reading) {
+    Said(:final message) || Changed(:final message) => message,
+    Judged(:final to) => to,
+    Joined() => null,
+  };
+}
+
+/// [journey] ended, at [event]: its loops stop, its programs close and its
+/// users are freed (loop_launcher), and the record takes nothing more on
+/// its paths' chains (is_journal). The person's next message in it opens it
+/// again, on a new path (RULINGS).
+///
+/// The docking station ends journeys (Nick, 16 Nov: "probably the docking
+/// station should end a journey, no?", and not as a tool of the agent's).
+/// What event ends one is not decided yet, so nothing decides one here; it
+/// is read back like any other decision.
+///
+/// The entry, of kind `ended`:
+///
+///     {"event": <hex>, "by": <who>, "journey": <id>}
+final class Ended extends Decision {
+  const Ended(super.event, {required super.by, required this.journey});
+
+  final JourneyId journey;
 }
 
 /// [event] declined: nothing comes of it, and nothing will, whatever
@@ -162,7 +216,7 @@ final class Admitted extends Decision {
 ///     {"event": <hex>, "by": <who>, "why": <case>, ...the case's own fields}
 ///
 /// `<case>` is `unread`, `not-admissible`, `duplicate`, `not-taken-in`,
-/// `not-a-turn`, `responds-unplaced` or `changes-unadmitted`.
+/// `not-a-turn`, `judged-unplaced` or `changes-unadmitted`.
 sealed class Declined extends Decision {
   const Declined(super.event, {required super.by});
 }
@@ -230,10 +284,10 @@ final class NotATurn extends DeclinedEvent {
   });
 }
 
-/// A response in [conversation], which is under no journey path, so no turn
-/// of the agent's there could have shown what was responded to.
-final class RespondsUnplaced extends DeclinedEvent {
-  const RespondsUnplaced(
+/// A verdict in [conversation], which is under no journey path, so no turn
+/// of the agent's there could have shown what was judged.
+final class JudgedUnplaced extends DeclinedEvent {
+  const JudgedUnplaced(
     super.event, {
     required super.by,
     required super.conversation,
@@ -241,8 +295,8 @@ final class RespondsUnplaced extends DeclinedEvent {
   });
 }
 
-/// A change to [message], which was never admitted, so there is no turn
-/// for it to change. `"message": <source>`.
+/// A change to [message], which was never admitted, or was admitted in a
+/// journey since ended, so there is no turn for it to change. `"message": <source>`.
 final class ChangesUnadmitted extends DeclinedEvent {
   const ChangesUnadmitted(
     super.event, {

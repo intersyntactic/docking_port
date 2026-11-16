@@ -1,8 +1,7 @@
 /// Deciding one event: whether it comes in, and where it goes.
 library;
 
-import 'package:is_conversation_shapes/is_conversation_shapes.dart'
-    show SourceMessageId;
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show DecidedBy;
 
@@ -17,7 +16,7 @@ import 'rules.dart';
 /// body is not what a relay records.
 ///
 /// In order: an event whose key was decided already is a [Duplicate]. A
-/// change goes where the message it changes went, and a response under its
+/// change goes where the message it changes went, and a verdict under its
 /// conversation's journey path. A join goes into its journey, and
 /// something said under its conversation's journey path, or a new one
 /// that the turn rule lets it start. A journey not yet started is started
@@ -53,21 +52,18 @@ Decision decide(
     );
   }
 
-  Admitted admit(Placement placement, {SourceMessageId? message}) => Admitted(
+  Admitted admit(Placement placement, [JsonObject? rules]) => Admitted(
     event,
     by: by,
-    conversation: conversation,
-    within: admissible.within,
-    key: key,
-    from: admissible.from,
-    message: message,
+    reading: admissible,
     placement: placement,
+    rules: rules,
   );
 
   switch (admissible) {
     case Changed(:final message):
       return switch (decided.journeyPathOfMessage(conversation, message)) {
-        final path? => admit(Under(path), message: message),
+        final path? => admit(Under(path)),
         null => ChangesUnadmitted(
           event,
           by: by,
@@ -76,10 +72,10 @@ Decision decide(
           message: message,
         ),
       };
-    case Responded(:final to):
+    case Judged():
       return switch (decided.journeyPathOf(conversation)) {
-        final path? => admit(Under(path), message: to),
-        null => RespondsUnplaced(
+        final path? => admit(Under(path)),
+        null => JudgedUnplaced(
           event,
           by: by,
           conversation: conversation,
@@ -88,32 +84,40 @@ Decision decide(
       };
     case Joined():
       return switch (_journey(admissible, decided, journeys)) {
-        final journey? => admit(IntoJourney(journey)),
+        (InJourney() && final journey, _) => admit(IntoJourney(journey)),
+        (final journey, final rules) => admit(IntoJourney(journey), rules),
         null => NotTakenIn(event, by: by, conversation: conversation, key: key),
       };
     case Said():
       final Placement placement;
+      JsonObject? rules;
       if (decided.journeyPathOf(conversation) case final path?) {
         placement = Under(path);
-      } else if (_journey(admissible, decided, journeys) case final journey?) {
+      } else if (_journey(admissible, decided, journeys)
+          case (final journey, final journeyRules)?) {
         placement = StartsJourneyPath(journey);
+        rules = journeyRules;
       } else {
         return NotTakenIn(event, by: by, conversation: conversation, key: key);
       }
       return turns.startsTurn(admissible, placement)
-          ? admit(placement, message: admissible.message)
+          ? admit(placement, rules)
           : NotATurn(event, by: by, conversation: conversation, key: key);
   }
 }
 
-/// The journey [first]'s conversation goes in: the journey of what it sits
-/// within (or of itself, when it sits within nothing) when that has
-/// started; a new one when [rule] takes it in; null when it doesn't.
-JourneyPlacement? _journey(
+/// The journey [first]'s conversation goes in, with its rules: the
+/// journey of what it sits within (or of itself, when it sits within
+/// nothing) when that has started; a new one when [rule] takes it in; null
+/// when it doesn't.
+(JourneyPlacement, JsonObject)? _journey(
   Admissible first,
   Decided decided,
   JourneyRule rule,
 ) => switch (decided.journeyOf(first.within ?? first.conversation)) {
-  final journey? => InJourney(journey),
-  null => rule.takesIn(first) ? const StartsJourney() : null,
+  final journey? => (InJourney(journey), decided.rulesOf(journey)),
+  null => switch (rule.takeIn(first)) {
+    final rules? => (const StartsJourney(), rules),
+    null => null,
+  },
 };
