@@ -14,10 +14,10 @@
 /// tip, so two docking stations that each believe they hold the chain cannot
 /// both decide one event: the second is refused, reads the first one's
 /// decision back, and goes on. "None is admitted twice" is the record's
-/// guarantee, not a set one process keeps. It holds once the chain has its
-/// first decision: the record starts a new chain for any entry that follows
-/// nothing, so two docking stations making the first decision at once would
-/// start two.
+/// guarantee, not a set one process keeps. It holds for the first decision
+/// too, since that follows the start entry rather than nothing: the record
+/// starts a new chain for any entry that follows nothing, so two docking
+/// stations making a first decision that followed nothing would start two.
 ///
 /// Each decision holds what it was decided on (the conversation, the
 /// event's key, the message), so the docking station's state is rebuilt from
