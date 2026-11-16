@@ -18,10 +18,19 @@ import 'package:test/test.dart';
 final ann = ActorId.parse('teams:t/p')!;
 final chat = ConversationId.parse('test:chat')!;
 
+/// The start entry's kind in these tests. The real one is the service's to
+/// name, so the runner is given it.
+const _startKind = 'test-start';
+
 /// A record in memory: entries in order, a follow that sends the backlog,
 /// then caught-up, then each new entry, and one chain of decisions whose
-/// tip a sent decision must follow, as the journal service checks.
+/// tip a sent decision must follow, as the journal service checks. It
+/// starts with its start entry, unless [started] is false.
 final class _Record {
+  _Record({bool started = true}) {
+    if (started) start();
+  }
+
   final _entries = <JournalEntryFrame>[];
   final _followers = <(Set<Kind>, StreamController<FollowItem>)>[];
   EntryHash? _tip;
@@ -39,6 +48,10 @@ final class _Record {
   List<AdmissionDecision> get decisions => [
     for (final frame in _entries) ?decodeDecision(frame.kind, frame.body),
   ];
+
+  /// The first start entry's hash.
+  EntryHash get startEntry =>
+      _entries.firstWhere((f) => f.kind.name == _startKind).hash;
 
   /// The hashes of the decisions recorded, in order.
   List<EntryHash> get decisionEntries => [
@@ -81,6 +94,14 @@ final class _Record {
       }),
     ),
   );
+
+  /// The start entry, as setup writes it: following nothing, and the
+  /// first thing the decisions' chain follows.
+  JournalEntryFrame start() {
+    final frame = add(_startKind, null, utf8.encode('{}'));
+    _tip ??= frame.hash;
+    return frame;
+  }
 
   /// [decision], sent by another docking station, following the tip.
   void decideElsewhere(AdmissionDecision decision) {
@@ -173,6 +194,7 @@ Future<void> _run(_Record record, _Reading reading) => runDockingStation(
   follow: record.follow,
   send: record.send,
   tipOf: record.tipOf,
+  startKind: Kind.parse(_startKind)!,
   readings: [reading],
   journeys: const _TakesIn(),
   turns: const _EverySaid(),
@@ -215,7 +237,7 @@ void main() {
 
     final [(firstFollows, first), (secondFollows, second)] = record.sent;
     final [firstEntry, _] = record.decisionEntries;
-    expect(firstFollows, isNull);
+    expect(firstFollows, record.startEntry);
     expect(first.event, a.hash);
     expect(first.by, DecidedBy.rules);
     expect(
@@ -343,5 +365,89 @@ void main() {
 
     expect(reading.given, [old.hash, now.hash]);
     expect(record.decisions.map((d) => d.event), [old.hash, now.hash]);
+  });
+
+  test('an event before the start entry is read but never decided, and the '
+      'first decision follows the start entry', () async {
+    final record = _Record(started: false);
+    final reading = _Reading();
+    final before = record.recordEvent({'said': 'test', 'key': 'a'});
+    final start = record.start();
+    final after = record.recordEvent({'said': 'real', 'key': 'b'});
+    await _runToEnd(record, reading);
+
+    expect(reading.given, [before.hash, after.hash]);
+    final [(follows, decision)] = record.sent;
+    expect(follows, start.hash);
+    expect(decision.event, after.hash);
+  });
+
+  test('with no start entry, decides nothing until one comes', () async {
+    final record = _Record(started: false);
+    record.recordEvent({'said': 'test', 'key': 'a'});
+    final running = _run(record, _Reading());
+    await pumpEventQueue();
+    expect(record.sent, isEmpty);
+
+    final start = record.start();
+    final after = record.recordEvent({'said': 'real', 'key': 'b'});
+    await pumpEventQueue();
+    await record.close();
+    await running;
+
+    final [(follows, decision)] = record.sent;
+    expect(follows, start.hash);
+    expect(decision.event, after.hash);
+  });
+
+  test('when two docking stations make the first decision at once, the '
+      'second takes the first one\'s', () async {
+    final record = _Record();
+    final a = record.recordEvent({'said': 'hello', 'key': 'a'});
+    record.beforeNextSend = () =>
+        record.decideElsewhere(_startsChat(a.hash, 'a'));
+    await _runToEnd(record, _Reading());
+
+    // Its own first decision followed the start entry, as the other's did,
+    // so the record refused it rather than starting a second chain.
+    expect(record.sent, hasLength(1));
+    expect(record.decisions.map((d) => d.event), [a.hash]);
+  });
+
+  test('a second start entry stops it', () async {
+    final record = _Record();
+    record.start();
+
+    await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+    await record.close();
+  });
+
+  test('a decision before the start entry stops it', () async {
+    final record = _Record(started: false);
+    final a = record.recordEvent({'said': 'hello', 'key': 'a'});
+    record.decideElsewhere(_startsChat(a.hash, 'a'));
+    record.start();
+
+    await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+    await record.close();
+  });
+
+  test('the start entry\'s kind is no event\'s or decision\'s', () async {
+    for (final kind in ['event', 'arrived', 'admitted', 'declined', 'ended']) {
+      final record = _Record();
+      await expectLater(
+        runDockingStation(
+          follow: record.follow,
+          send: record.send,
+          tipOf: record.tipOf,
+          startKind: Kind.parse(kind)!,
+          readings: [_Reading()],
+          journeys: const _TakesIn(),
+          turns: const _EverySaid(),
+        ),
+        throwsA(isA<ArgumentError>()),
+        reason: kind,
+      );
+    }
   });
 }

@@ -26,13 +26,24 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 /// Runs the docking station until [follow]'s stream ends, which it never
 /// should: the caller treats a return as the record going away.
 ///
-/// It follows the record from its start, asking [follow] for its events
-/// and its `admitted` and `declined` entries. Each event is read by the
-/// one of [readings] for its source, in the record's order, and each
-/// decision is taken into a [DecidedSoFar]. Once [follow] has caught up, each
-/// event with no decision is decided under [journeys] and [turns], in
-/// order, and sent with [send] following the decision before it; so is
-/// each event after that, as it comes.
+/// It follows the record from its start, asking [follow] for its events,
+/// its decisions and its start entry, the one entry of [startKind]. Each
+/// event is read by the one of [readings] for its source, in the record's
+/// order, and each decision is taken into a [DecidedSoFar]. Once [follow]
+/// has caught up, each event after the start entry with no decision is
+/// decided under [journeys] and [turns], in order, and sent with [send]
+/// following the decision before it, or the start entry for the first; so
+/// is each event after that, as it comes.
+///
+/// The start entry is written once, at setup, by whoever sets the docking
+/// station up, never by the docking station: two of them starting at once
+/// would each write one (Nick, 16 Nov: leave events from before the first
+/// run undecided). An event before it is read, so a reading learns from
+/// its history, but never decided. With no start entry yet, nothing is
+/// decided until one comes. A second start entry, or a decision before
+/// the first, stops it: a later start entry that reset what was decided
+/// is a call not made (one start entry, intersyntactic-a8 and this
+/// session's lean, 16 Nov; the open questions hold it).
 ///
 /// When the record refuses a decision, [tipOf] says whether the decisions'
 /// chain has moved on. If it has, another docking station decided first, and
@@ -50,6 +61,7 @@ Future<void> runDockingStation({
   )
   send,
   required Future<EntryHash> Function(EntryHash entry) tipOf,
+  required Kind startKind,
   required Iterable<ModuleReading<Object?>> readings,
   required JourneyRule journeys,
   required TurnRule turns,
@@ -65,14 +77,24 @@ Future<void> runDockingStation({
     }
     folds[reading.source] = _Fold(reading);
   }
+  if (_eventKinds.contains(startKind) ||
+      DecisionEntryKind.all.contains(startKind)) {
+    throw ArgumentError.value(
+      startKind,
+      'startKind',
+      'is the kind of an event or a decision',
+    );
+  }
   final decided = DecidedSoFar();
-  // Each event read but not yet decided, with its reading, in the record's
-  // order.
+  // The start entry, once it has come.
+  EntryHash? start;
+  // Each event after the start entry read but not yet decided, with its
+  // reading, in the record's order.
   final waiting = <EntryHash, EventReading?>{};
 
   // Decides each waiting event in order. Returns early when another
   // docking station has decided first: its decisions come on the record.
-  Future<void> decideWaiting() async {
+  Future<void> decideWaiting(EntryHash start) async {
     while (waiting.isNotEmpty) {
       final MapEntry(key: event, value: reading) = waiting.entries.first;
       final decision = decide(
@@ -83,12 +105,12 @@ Future<void> runDockingStation({
         turns: turns,
       );
       final (kind, body) = encodeDecision(decision);
-      final follows = decided.tip;
+      final follows = decided.tip ?? start;
       final EntryHash entry;
       try {
         entry = await send(kind, follows, body);
       } on JournalWriteRefused {
-        if (follows != null && await tipOf(follows) != follows) return;
+        if (await tipOf(follows) != follows) return;
         rethrow;
       }
       decided.take(entry, decision);
@@ -97,17 +119,30 @@ Future<void> runDockingStation({
   }
 
   var caughtUp = false;
-  final kinds = {..._eventKinds, ...DecisionEntryKind.all};
+  final kinds = {..._eventKinds, ...DecisionEntryKind.all, startKind};
   await for (final item in follow(kinds)) {
     switch (item) {
       case JournalEntryFrame(:final hash, :final kind)
           when _eventKinds.contains(kind):
+        // Read whether or not it is decided, so a reading learns from the
+        // events before the start entry too.
         final event = RelayedEvent.read(hash, item.body);
-        waiting[hash] = switch (event) {
+        final reading = switch (event) {
           final event? => folds[event.source]?.step(event),
           null => null,
         };
+        if (start != null) waiting[hash] = reading;
+      case JournalEntryFrame(:final hash, :final kind) when kind == startKind:
+        if (start != null) {
+          throw StateError(
+            'a second start entry ${hash.hex}, after ${start.hex}',
+          );
+        }
+        start = hash;
       case JournalEntryFrame(:final hash, :final kind):
+        if (start == null) {
+          throw StateError('the decision ${hash.hex} is before any start');
+        }
         final decision =
             decodeDecision(kind, item.body) ??
             (throw StateError('cannot read the decision ${hash.hex}'));
@@ -116,7 +151,7 @@ Future<void> runDockingStation({
       case CaughtUp():
         caughtUp = true;
     }
-    if (caughtUp) await decideWaiting();
+    if (caughtUp && start != null) await decideWaiting(start);
   }
 }
 
