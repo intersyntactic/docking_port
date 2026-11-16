@@ -9,15 +9,15 @@
 /// not reached, never one it turned away, so a reading or a rule changed
 /// since cannot admit an old event it once declined.
 ///
-/// The decisions are one chain in the record, each following the one
-/// before it. The record refuses an entry that does not follow its chain's
-/// tip, so two docking stations that each believe they hold the chain cannot
-/// both decide one event: the second is refused, reads the first one's
-/// decision back, and goes on. "None is admitted twice" is the record's
-/// guarantee, not a set one process keeps. It holds for the first decision
-/// too, since that follows the start entry rather than nothing: the record
-/// starts a new chain for any entry that follows nothing, so two docking
-/// stations making a first decision that followed nothing would start two.
+/// The decisions are one chain in the record, each naming the one before it
+/// as previous. The record refuses an entry whose previous is not its
+/// chain's tip, so two docking stations that each believe they hold the
+/// chain cannot both decide one event: the second is refused, reads the
+/// first one's decision back, and goes on. "None is admitted twice" is the
+/// record's guarantee, not a set one process keeps. It holds for the first
+/// decision too, since its previous is the start entry rather than none: the
+/// record starts a new chain for any entry with no previous, so two docking
+/// stations making a first decision with none would start two.
 ///
 /// Each decision holds what it was decided on (the conversation, the
 /// event's key, the message), so the docking station's state is rebuilt from
@@ -48,7 +48,8 @@ abstract final class DecisionEntryKind {
   /// An [JourneyEnded]'s kind.
   static final ended = Kind.parse('ended')!;
 
-  /// Every kind above, as the docking station follows its own decisions.
+  /// Every kind above, as the docking station subscribes to its own
+  /// decisions.
   static final all = {admitted, declined, ended};
 }
 

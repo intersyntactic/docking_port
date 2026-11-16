@@ -112,12 +112,18 @@ uses the same one.
 ## Where it stands
 
 - **Built:** the reading contract: `RelayedEvent`, `ModuleReading`,
-  `EventReading` and its cases, `ConversationId`, `EventKey`.
-- **Proposed, not agreed:** admission, meaning the decision recorded for each
-  event, the rules passed in, and rebuilding from the record
+  `EventReading` and its cases, `ConversationId`, `EventKey`. Admission,
+  meaning the decision recorded for each event, the rules passed in, and
+  rebuilding from the record
   (https://github.com/intersyntactic/docking_station/pull/2,
   https://github.com/intersyntactic/docking_station/pull/3); who made each
-  decision (https://github.com/intersyntactic/docking_station/pull/5); following
+  decision (https://github.com/intersyntactic/docking_station/pull/5); reading
   the record and sending each decision
-  (https://github.com/intersyntactic/docking_station/pull/6).
+  (https://github.com/intersyntactic/docking_station/pull/6), now through
+  `is_journal_client`; the start entry
+  (https://github.com/intersyntactic/docking_station/pull/15); and
+  `path_start.dart`, the airlock's narrow reader
+  (https://github.com/intersyntactic/docking_station/pull/14).
+- **Not yet:** the service that runs it on a machine, with a real
+  `JournalReader` and `JournalWriter`.
 - **Coming:** handing admitted events to a journey path's agent loop.

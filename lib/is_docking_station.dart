@@ -11,8 +11,8 @@
 /// [encodeDecision] writes it and [decodeDecision] reads it back; [decide],
 /// which makes one under the rules passed in, [JourneyRule] and [TurnRule];
 /// [DecidedSoFar], what the decisions add up to when read back; and
-/// [runDockingStation], which follows the record and sends each decision to
-/// it.
+/// [runDockingStation], which subscribes to the record and sends each
+/// decision to it.
 ///
 /// Not here yet: handing an event to a journey path's apex.
 library;

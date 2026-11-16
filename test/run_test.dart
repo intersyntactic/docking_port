@@ -4,14 +4,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:agent_loop/agent_loop.dart'
-    show CaughtUp, FollowItem, JournalEntryFrame, JournalWriteRefused;
 import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
-import 'package:is_journal/is_journal.dart' show EntryHash;
-import 'package:is_journal/service.dart' show Kind;
+import 'package:is_journal_client/is_journal_client.dart';
 import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy;
 import 'package:test/test.dart';
 
@@ -22,64 +19,65 @@ final chat = ConversationId.parse('test:chat')!;
 /// name, so the runner is given it.
 const _startKind = 'test-start';
 
-/// A record in memory: entries in order, a follow that sends the backlog,
-/// then caught-up, then each new entry, and one chain of decisions whose
-/// tip a sent decision must follow, as the journal service checks. It
-/// starts with its start entry, unless [started] is false.
+/// A record in memory: entries in order, a subscription that sends the
+/// backlog, then caught-up, then each new entry, and one chain of decisions
+/// whose tip a sent decision must name as previous, as the journal service
+/// checks. It starts with its start entry, unless [started] is false.
 final class _Record {
   _Record({bool started = true}) {
     if (started) start();
   }
 
-  final _entries = <JournalEntryFrame>[];
-  final _followers = <(Set<Kind>, StreamController<FollowItem>)>[];
+  final _entries = <Entry>[];
+  final _subscribers = <(Set<Kind>, StreamController<Subscribed>)>[];
   EntryHash? _tip;
 
-  /// Each decision sent, refused or not, with what it followed.
+  /// Each decision sent, refused or not, with the previous it named.
   final sent = <(EntryHash?, AdmissionDecision)>[];
 
   /// Run once, as the next decision is sent, before it is checked.
   void Function()? beforeNextSend;
 
-  /// Why every decision sent is refused, when set.
-  String? refuse;
+  /// What every decision sent is answered with instead, when set.
+  WriteResult? answer;
 
   /// The decisions recorded, in order.
   List<AdmissionDecision> get decisions => [
-    for (final frame in _entries) ?decodeDecision(frame.kind, frame.body),
+    for (final entry in _entries) ?decodeDecision(entry.kind!, entry.body),
   ];
 
   /// The first start entry's hash.
   EntryHash get startEntry =>
-      _entries.firstWhere((f) => f.kind.name == _startKind).hash;
+      _entries.firstWhere((e) => e.kind!.name == _startKind).hash;
 
   /// The hashes of the decisions recorded, in order.
   List<EntryHash> get decisionEntries => [
-    for (final frame in _entries)
-      if (decodeDecision(frame.kind, frame.body) != null) frame.hash,
+    for (final entry in _entries)
+      if (decodeDecision(entry.kind!, entry.body) != null) entry.hash,
   ];
 
-  JournalEntryFrame add(String kind, EntryHash? follows, List<int> body) {
-    final header = utf8.encode('$kind\n${follows?.hex ?? '-'}\n');
+  Entry add(String kind, EntryHash? previous, List<int> body) {
+    final header = utf8.encode('$kind\n${previous?.hex ?? '-'}\n');
     final bytes = Uint8List.fromList([...header, ...body]);
     // A kind made from its name, never one of the docking station's own, so
     // the docking station has to compare kinds by value.
-    final frame = JournalEntryFrame(
+    final entry = Entry(
       hash: EntryHash.of(bytes),
       kind: Kind.parse(kind)!,
-      follows: follows,
-      bytes: bytes,
+      previous: previous,
+      recorded: bytes,
+      checked: false,
     );
-    _entries.add(frame);
-    for (final (kinds, follower) in _followers) {
-      if (kinds.contains(frame.kind)) follower.add(frame);
+    _entries.add(entry);
+    for (final (kinds, subscriber) in _subscribers) {
+      if (kinds.contains(entry.kind)) subscriber.add(entry);
     }
-    return frame;
+    return entry;
   }
 
   /// An event from [source], whose bytes are [what] as JSON, recorded as an
   /// entry of [kind].
-  JournalEntryFrame recordEvent(
+  Entry recordEvent(
     Map<String, Object?> what, {
     String source = 'test',
     String kind = 'event',
@@ -95,47 +93,49 @@ final class _Record {
     ),
   );
 
-  /// The start entry, as setup writes it: following nothing, and the
-  /// first thing the decisions' chain follows.
-  JournalEntryFrame start() {
-    final frame = add(_startKind, null, utf8.encode('{}'));
-    _tip ??= frame.hash;
-    return frame;
+  /// The start entry, as setup writes it: with no previous, and the first
+  /// thing a decision names as previous.
+  Entry start() {
+    final entry = add(_startKind, null, utf8.encode('{}'));
+    _tip ??= entry.hash;
+    return entry;
   }
 
-  /// [decision], sent by another docking station, following the tip.
+  /// [decision], sent by another docking station, naming the tip.
   void decideElsewhere(AdmissionDecision decision) {
     final (kind, body) = encodeDecision(decision);
     _tip = add(kind.name, _tip, body).hash;
   }
 
-  Stream<FollowItem> follow(Set<Kind> kinds) {
-    final follower = StreamController<FollowItem>();
-    for (final frame in _entries) {
-      if (kinds.contains(frame.kind)) follower.add(frame);
+  Stream<Subscribed> subscribe(Set<Kind> kinds) {
+    final subscriber = StreamController<Subscribed>();
+    for (final entry in _entries) {
+      if (kinds.contains(entry.kind)) subscriber.add(entry);
     }
-    follower.add(CaughtUp(_entries.lastOrNull?.hash));
-    _followers.add((kinds, follower));
-    return follower.stream;
+    subscriber.add(CaughtUp(_entries.lastOrNull?.hash));
+    _subscribers.add((kinds, subscriber));
+    return subscriber.stream;
   }
 
-  Future<EntryHash> send(Kind kind, EntryHash? follows, Uint8List body) async {
-    sent.add((follows, decodeDecision(kind, body)!));
+  Future<WriteResult> send(
+    Kind kind,
+    List<int> body, {
+    EntryHash? previous,
+  }) async {
+    sent.add((previous, decodeDecision(kind, Uint8List.fromList(body))!));
     final before = beforeNextSend;
     beforeNextSend = null;
     before?.call();
-    if (refuse case final why?) throw JournalWriteRefused(why);
-    if (follows != _tip) throw JournalWriteRefused('$follows is not the tip');
-    final hash = add(kind.name, follows, body).hash;
+    if (answer case final answer?) return answer;
+    if (previous != _tip) return NotTip(_tip!);
+    final hash = add(kind.name, previous, body).hash;
     _tip = hash;
-    return hash;
+    return Written(hash);
   }
 
-  Future<EntryHash> tipOf(EntryHash entry) async => _tip!;
-
   Future<void> close() async {
-    for (final (_, follower) in _followers) {
-      await follower.close();
+    for (final (_, subscriber) in _subscribers) {
+      await subscriber.close();
     }
   }
 }
@@ -191,9 +191,8 @@ final class _EverySaid implements TurnRule {
 }
 
 Future<void> _run(_Record record, _Reading reading) => runDockingStation(
-  follow: record.follow,
+  subscribe: record.subscribe,
   send: record.send,
-  tipOf: record.tipOf,
   startKind: Kind.parse(_startKind)!,
   readings: [reading],
   journeys: const _TakesIn(),
@@ -228,16 +227,16 @@ EventAdmitted _startsChat(EntryHash event, String key) => EventAdmitted(
 );
 
 void main() {
-  test('once caught up, decides each waiting event, each following the '
+  test('once caught up, decides each waiting event, each naming the '
       'one before', () async {
     final record = _Record();
     final a = record.recordEvent({'said': 'hello', 'key': 'a'});
     final b = record.recordEvent({'said': 'again', 'key': 'b'});
     await _runToEnd(record, _Reading());
 
-    final [(firstFollows, first), (secondFollows, second)] = record.sent;
+    final [(firstPrevious, first), (secondPrevious, second)] = record.sent;
     final [firstEntry, _] = record.decisionEntries;
-    expect(firstFollows, record.startEntry);
+    expect(firstPrevious, record.startEntry);
     expect(first.event, a.hash);
     expect(first.by, DecidedBy.rules);
     expect(
@@ -248,7 +247,7 @@ void main() {
         isA<StartsJourney>(),
       ),
     );
-    expect(secondFollows, firstEntry);
+    expect(secondPrevious, firstEntry);
     expect(second.event, b.hash);
     expect(
       ((second as EventAdmitted).placement as UnderJourneyPath).journeyPath.hex,
@@ -266,9 +265,9 @@ void main() {
     await _runToEnd(record, reading);
 
     final aDecision = record.decisionEntries.first;
-    final [(follows, decision)] = record.sent;
+    final [(previous, decision)] = record.sent;
     expect(reading.given, [a.hash, b.hash]);
-    expect(follows, aDecision);
+    expect(previous, aDecision);
     expect(decision.event, b.hash);
     expect(
       ((decision as EventAdmitted).placement as UnderJourneyPath)
@@ -315,20 +314,23 @@ void main() {
     expect(record.decisions.last, isA<SaidStartsNoTurn>());
   });
 
-  test('a refusal while the chain has not moved is rethrown', () async {
-    final record = _Record();
-    final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
-    record.decideElsewhere(_startsChat(a0.hash, 'a0'));
-    record.recordEvent({'said': 'again', 'key': 'a'});
-    record.refuse = 'docking-station may not send admitted';
+  for (final (what, answer) in [
+    ('a refusal', const WriteRefused('kind-not-allowed admitted')),
+    ('a failed add', const WriteFailed('disk full')),
+    ('no answer', const Unanswered('closed before answering')),
+  ]) {
+    test('$what, rather than not-tip, stops it', () async {
+      final record = _Record();
+      final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
+      record.decideElsewhere(_startsChat(a0.hash, 'a0'));
+      record.recordEvent({'said': 'again', 'key': 'a'});
+      record.answer = answer;
 
-    await expectLater(
-      _run(record, _Reading()),
-      throwsA(isA<JournalWriteRefused>()),
-    );
-    expect(record.decisions, hasLength(1));
-    await record.close();
-  });
+      await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+      expect(record.decisions, hasLength(1));
+      await record.close();
+    });
+  }
 
   test('a decision it cannot read stops it', () async {
     final record = _Record();
@@ -368,7 +370,7 @@ void main() {
   });
 
   test('an event before the start entry is read but never decided, and the '
-      'first decision follows the start entry', () async {
+      'first decision names the start entry', () async {
     final record = _Record(started: false);
     final reading = _Reading();
     final before = record.recordEvent({'said': 'test', 'key': 'a'});
@@ -377,8 +379,8 @@ void main() {
     await _runToEnd(record, reading);
 
     expect(reading.given, [before.hash, after.hash]);
-    final [(follows, decision)] = record.sent;
-    expect(follows, start.hash);
+    final [(previous, decision)] = record.sent;
+    expect(previous, start.hash);
     expect(decision.event, after.hash);
   });
 
@@ -395,8 +397,8 @@ void main() {
     await record.close();
     await running;
 
-    final [(follows, decision)] = record.sent;
-    expect(follows, start.hash);
+    final [(previous, decision)] = record.sent;
+    expect(previous, start.hash);
     expect(decision.event, after.hash);
   });
 
@@ -408,7 +410,7 @@ void main() {
         record.decideElsewhere(_startsChat(a.hash, 'a'));
     await _runToEnd(record, _Reading());
 
-    // Its own first decision followed the start entry, as the other's did,
+    // Its own first decision named the start entry, as the other's did,
     // so the record refused it rather than starting a second chain.
     expect(record.sent, hasLength(1));
     expect(record.decisions.map((d) => d.event), [a.hash]);
@@ -437,9 +439,8 @@ void main() {
       final record = _Record();
       await expectLater(
         runDockingStation(
-          follow: record.follow,
+          subscribe: record.subscribe,
           send: record.send,
-          tipOf: record.tipOf,
           startKind: Kind.parse(kind)!,
           readings: [_Reading()],
           journeys: const _TakesIn(),

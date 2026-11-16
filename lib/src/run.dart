@@ -1,14 +1,21 @@
-/// Running the docking station: following the record, deciding each event,
+/// Running the docking station: reading the record, deciding each event,
 /// and sending each decision to it (RULINGS, "The docking station admits
 /// events under journey paths").
 library;
 
-import 'dart:typed_data';
-
-import 'package:agent_loop/agent_loop.dart'
-    show CaughtUp, FollowItem, JournalEntryFrame, JournalWriteRefused;
-import 'package:is_journal/is_journal.dart' show EntryHash;
-import 'package:is_journal/service.dart' show Kind;
+import 'package:is_journal_client/is_journal_client.dart'
+    show
+        CaughtUp,
+        Entry,
+        EntryHash,
+        Kind,
+        NotTip,
+        Subscribed,
+        Unanswered,
+        WriteFailed,
+        WriteRefused,
+        WriteResult,
+        Written;
 
 import 'decide.dart';
 import 'decided.dart';
@@ -23,17 +30,18 @@ import 'rules.dart';
 /// event, not an arrival").
 final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 
-/// Runs the docking station until [follow]'s stream ends, which it never
+/// Runs the docking station until [subscribe]'s stream ends, which it never
 /// should: the caller treats a return as the record going away.
 ///
-/// It follows the record from its start, asking [follow] for its events,
-/// its decisions and its start entry, the one entry of [startKind]. Each
-/// event is read by the one of [readings] for its source, in the record's
-/// order, and each decision is taken into a [DecidedSoFar]. Once [follow]
-/// has caught up, each event after the start entry with no decision is
-/// decided under [journeys] and [turns], in order, and sent with [send]
-/// following the decision before it, or the start entry for the first; so
-/// is each event after that, as it comes.
+/// It reads the record from its start, subscribing with [subscribe] to its
+/// events, its decisions and its start entry, the one entry of [startKind].
+/// Each event is read by the one of [readings] for its source, in the
+/// record's order, and each decision is taken into a [DecidedSoFar]. Once
+/// the subscription has caught up, each event after the start entry with no
+/// decision is decided under [journeys] and [turns], in order, and sent with
+/// [send], naming the decision before it as previous, or the start entry for
+/// the first; so is each event after that, as it comes. [subscribe] and
+/// [send] are a `JournalReader`'s and a `JournalWriter`'s, or stand-ins.
 ///
 /// The start entry is written once, at setup, by whoever sets the docking
 /// station up, never by the docking station: two of them starting at once
@@ -45,22 +53,22 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 /// is a call not made (one start entry, intersyntactic-a8 and this
 /// session's lean, 16 Nov; the open questions hold it).
 ///
-/// When the record refuses a decision, [tipOf] says whether the decisions'
-/// chain has moved on. If it has, another docking station decided first, and
-/// its decision comes on the record to be taken like any other. If it
-/// hasn't, the refusal is for some other reason, such as a sender table
-/// that doesn't allow the kind, and it is rethrown: deciding on regardless
-/// could admit an event twice. A decision in the record that can't be read
-/// back stops it too, for the same reason.
+/// When the record answers [NotTip], the decisions' chain has moved on:
+/// another docking station decided first, and its decision comes on the
+/// record to be taken like any other. Any other answer but [Written] stops
+/// it with a [StateError]: a refusal for some other reason, such as a sender
+/// table that doesn't allow the kind, or no answer, after which the decision
+/// may or may not be in. Deciding on regardless could admit an event twice;
+/// started again, it reads back whatever got in. A decision in the record
+/// that can't be read back stops it too, for the same reason.
 Future<void> runDockingStation({
-  required Stream<FollowItem> Function(Set<Kind> kinds) follow,
-  required Future<EntryHash> Function(
+  required Stream<Subscribed> Function(Set<Kind> kinds) subscribe,
+  required Future<WriteResult> Function(
     Kind kind,
-    EntryHash? follows,
-    Uint8List body,
-  )
+    List<int> body, {
+    EntryHash? previous,
+  })
   send,
-  required Future<EntryHash> Function(EntryHash entry) tipOf,
   required Kind startKind,
   required Iterable<ModuleReading<Object?>> readings,
   required JourneyRule journeys,
@@ -105,14 +113,18 @@ Future<void> runDockingStation({
         turns: turns,
       );
       final (kind, body) = encodeDecision(decision);
-      final follows = decided.tip ?? start;
-      final EntryHash entry;
-      try {
-        entry = await send(kind, follows, body);
-      } on JournalWriteRefused {
-        if (await tipOf(follows) != follows) return;
-        rethrow;
-      }
+      final previous = decided.tip ?? start;
+      final entry = switch (await send(kind, body, previous: previous)) {
+        Written(:final entry) => entry,
+        NotTip() => null,
+        WriteRefused(:final why) => throw StateError(
+          'the decision on ${event.hex} was refused: $why',
+        ),
+        WriteFailed(:final why) || Unanswered(:final why) => throw StateError(
+          'the decision on ${event.hex} may or may not be in: $why',
+        ),
+      };
+      if (entry == null) return;
       decided.take(entry, decision);
       waiting.remove(event);
     }
@@ -120,10 +132,12 @@ Future<void> runDockingStation({
 
   var caughtUp = false;
   final kinds = {..._eventKinds, ...DecisionEntryKind.all, startKind};
-  await for (final item in follow(kinds)) {
+  await for (final item in subscribe(kinds)) {
     switch (item) {
-      case JournalEntryFrame(:final hash, :final kind)
-          when _eventKinds.contains(kind):
+      case Entry(:final hash, kind: null):
+        // A subscription only sends entries of the kinds asked for.
+        throw StateError('the entry ${hash.hex} has no kind');
+      case Entry(:final hash, :final kind) when _eventKinds.contains(kind):
         // Read whether or not it is decided, so a reading learns from the
         // events before the start entry too.
         final event = RelayedEvent.read(hash, item.body);
@@ -132,14 +146,14 @@ Future<void> runDockingStation({
           null => null,
         };
         if (start != null) waiting[hash] = reading;
-      case JournalEntryFrame(:final hash, :final kind) when kind == startKind:
+      case Entry(:final hash, :final kind) when kind == startKind:
         if (start != null) {
           throw StateError(
             'a second start entry ${hash.hex}, after ${start.hex}',
           );
         }
         start = hash;
-      case JournalEntryFrame(:final hash, :final kind):
+      case Entry(:final hash, kind: final kind?):
         if (start == null) {
           throw StateError('the decision ${hash.hex} is before any start');
         }

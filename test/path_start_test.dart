@@ -19,9 +19,9 @@ final _b = 'b' * 64, _c = 'c' * 64;
 
 /// [decision] as the record holds it: the header its ids are hashed with,
 /// then its body.
-Uint8List _entry(AdmissionDecision decision, {String follows = '-'}) {
+Uint8List _entry(AdmissionDecision decision, {String previous = '-'}) {
   final (kind, body) = encodeDecision(decision);
-  return Uint8List.fromList([...utf8.encode('$kind\n$follows\n'), ...body]);
+  return Uint8List.fromList([...utf8.encode('$kind\n$previous\n'), ...body]);
 }
 
 Uint8List _raw(String kind, Map<String, Object?> json) =>
@@ -91,7 +91,7 @@ void main() {
       startsTurn: true,
     );
     final a = _read(_entry(decision)) as StartsPath;
-    final b = _read(_entry(decision, follows: _b)) as StartsPath;
+    final b = _read(_entry(decision, previous: _b)) as StartsPath;
     expect(a.path, isNot(b.path));
   });
 

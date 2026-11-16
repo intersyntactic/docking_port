@@ -15,15 +15,15 @@ import 'reading.dart';
 
 /// Every decision so far, as the questions deciding the next event asks.
 ///
-/// How it is used: the docking station follows the record's events and its
-/// own `admitted` and `declined` entries from the record's start. It folds
-/// each event through its module's reading and [take]s each decision. At
-/// `caught-up` it decides, in order, each event that has no decision.
+/// How it is used: the docking station subscribes to the record's events and
+/// its own `admitted` and `declined` entries from the record's start. It
+/// folds each event through its module's reading and [take]s each decision.
+/// At `caught-up` it decides, in order, each event that has no decision.
 /// Those are only ever the last few, because it records each decision
 /// before deciding the next. Then it decides each new event as it comes.
-/// Each decision is sent following [tip]. A refusal means another docking
-/// station decided first, and its decision comes on the record to be taken
-/// like any other.
+/// Each decision is sent naming [tip] as previous. A `not-tip` refusal means
+/// another docking station decided first, and its decision comes on the
+/// record to be taken like any other.
 final class DecidedSoFar {
   EntryHash? _tip;
   final _taken = <EntryHash>{};
@@ -35,7 +35,8 @@ final class DecidedSoFar {
   final _rules = <JourneyId, JsonObject>{};
   final _messages = <(ConversationId, SourceMessageId), JourneyPathId>{};
 
-  /// The last decision: what the next one follows. Null before the first.
+  /// The last decision: what the next one names as previous. Null before the
+  /// first.
   EntryHash? get tip => _tip;
 
   /// Whether [event] has been decided.
