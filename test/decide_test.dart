@@ -2,16 +2,17 @@
 // record: the questions one decision asks of the ones before it.
 import 'dart:convert';
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_journal/is_journal.dart' show EntryHash;
-import 'package:is_shapes/is_shapes.dart' show ActorId;
+import 'package:is_shapes/is_shapes.dart' show ActorId, JourneyId;
 import 'package:test/test.dart';
 
 final class _All implements JourneyRule, TurnRule {
   @override
-  bool takesIn(Admissible first) => true;
+  JsonObject takeIn(Admissible first) => const JsonObject.of({'tools': 'all'});
 
   @override
   bool startsTurn(Said said, Placement placement) => true;
@@ -50,4 +51,61 @@ void main() {
     // the first either way.
     expect(ofs, [events[0], events[0], events[0]]);
   });
+
+  test('a path started in a journey already taken in records the rules '
+      'the journey was taken in under, without asking the rule again', () {
+    final channel = Conversation.parse('test:channel')!;
+    Said said(String thread, String key) => Said(
+      conversation: Conversation.parse('test:channel;$thread')!,
+      within: channel,
+      key: EventKey.parse(key)!,
+      node: UserSaid(
+        author: ActorId.parse('teams:t/p')!,
+        source: SourceMessageId.parse('$thread|$key')!,
+        text: 'hi',
+      ),
+    );
+    final rule = _Counting();
+    final decided = Decided();
+    final first = decide(
+      _hash('A'),
+      said('t1', 'a'),
+      decided,
+      journeys: rule,
+      turns: _All(),
+    );
+    decided.take(_hash('decision A'), first);
+    final second = decide(
+      _hash('B'),
+      said('t2', 'b'),
+      decided,
+      journeys: rule,
+      turns: _All(),
+    );
+    expect(rule.asked, 1);
+    expect((first as Admitted).placement, isA<StartsJourneyPath>());
+    final placement = (second as Admitted).placement;
+    expect(
+      placement,
+      isA<StartsJourneyPath>().having(
+        (p) => p.journey,
+        'journey',
+        isA<InJourney>().having(
+          (j) => j.journey,
+          'journey',
+          JourneyId.parse(_hash('decision A').hex),
+        ),
+      ),
+    );
+    expect(second.rules?.asUncheckedMap(), {'asked': 1});
+  });
+}
+
+/// Takes every journey in, under rules that say how many times it was
+/// asked.
+final class _Counting implements JourneyRule {
+  var asked = 0;
+
+  @override
+  JsonObject takeIn(Admissible first) => JsonObject.of({'asked': ++asked});
 }

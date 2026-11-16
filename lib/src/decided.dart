@@ -4,6 +4,7 @@
 /// back, not by working them out again").
 library;
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
@@ -30,6 +31,7 @@ final class Decided {
   final _events = <(Conversation, EventKey), EntryHash>{};
   final _journeyPaths = <Conversation, JourneyPathId>{};
   final _journeys = <Conversation, JourneyId>{};
+  final _rules = <JourneyId, JsonObject>{};
   final _messages = <(Conversation, SourceMessageId), JourneyPathId>{};
 
   /// The last decision: what the next one follows. Null before the first.
@@ -52,6 +54,10 @@ final class Decided {
   /// channel, or one that sits within nothing, such as a chat. Null before
   /// it starts.
   JourneyId? journeyOf(Conversation outside) => _journeys[outside];
+
+  /// The rules [journey] was taken in under. Only for a journey that
+  /// [journeyOf] has given, since every entry that starts one records them.
+  JsonObject rulesOf(JourneyId journey) => _rules[journey]!;
 
   /// The journey path the message [message] in [conversation] was admitted
   /// under: where a change to it goes. Null when it was never admitted.
@@ -89,7 +95,8 @@ final class Decided {
 
     void journey(JourneyPlacement placement) {
       if (placement is StartsJourney) {
-        _journeys[outside] = JourneyId.parse(entry.hex)!;
+        final journey = _journeys[outside] = JourneyId.parse(entry.hex)!;
+        _rules[journey] = admitted.rules!;
       }
     }
 

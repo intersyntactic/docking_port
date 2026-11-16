@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:agent_loop/agent_loop.dart'
     show CaughtUp, FollowItem, JournalEntryFrame, JournalWriteRefused;
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
@@ -157,7 +158,7 @@ final class _TakesIn implements JourneyRule {
   const _TakesIn();
 
   @override
-  bool takesIn(Admissible first) => true;
+  JsonObject takeIn(Admissible first) => const JsonObject.of({'tools': 'all'});
 }
 
 final class _EverySaid implements TurnRule {
@@ -199,6 +200,7 @@ Admitted _startsChat(EntryHash event, String key) => Admitted(
     ),
   ),
   placement: const StartsJourneyPath(StartsJourney()),
+  rules: const JsonObject.of({'tools': 'all'}),
 );
 
 void main() {

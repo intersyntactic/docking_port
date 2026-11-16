@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_annotation_shapes/is_annotation_shapes.dart'
     show ProposedCorrectionVerdict;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
@@ -66,8 +67,15 @@ final readings = <Admissible>[
   ),
 ];
 
-Admitted _admitted(Placement placement, DecidedBy by) =>
-    Admitted(event, by: by, reading: said, placement: placement);
+const rules = JsonObject.of({'tools': 'all'});
+
+Admitted _admitted(Placement placement, DecidedBy by) => Admitted(
+  event,
+  by: by,
+  reading: said,
+  placement: placement,
+  rules: Admitted.starts(placement) ? rules : null,
+);
 
 String _text((Kind, Uint8List) entry) => utf8.decode(entry.$2);
 
@@ -83,7 +91,8 @@ void main() {
       '"conversation":"teams:19:x;messageid=1","within":"teams:19:x",'
       '"key":"message:1","node":{"shape":"UserSaid","author":"teams:t/p",'
       '"source":"19:x;messageid=1|1","text":"hi"}},'
-      '"startsJourneyPath":true,"startsJourney":true}',
+      '"startsJourneyPath":true,"startsJourney":true,'
+      '"rules":{"tools":"all"}}',
     );
   });
 
@@ -279,6 +288,28 @@ void main() {
     ];
     for (final (kind, json) in bad) {
       expect(decodeDecision(kind, bytes(json)), isNull, reason: '$json');
+    }
+    final starts = {
+      ...good,
+      'startsJourneyPath': true,
+      'startsJourney': true,
+      'rules': {'tools': 'all'},
+    }..remove('journeyPath');
+    expect(decodeDecision(DecisionKind.admitted, bytes(starts)), isNotNull);
+    for (final json in [
+      {
+        ...good,
+        'rules': {'tools': 'all'},
+      },
+      {...starts}..remove('rules'),
+      {...starts, 'rules': 'all'},
+      {...starts, 'rules': null},
+    ]) {
+      expect(
+        decodeDecision(DecisionKind.admitted, bytes(json)),
+        isNull,
+        reason: '$json',
+      );
     }
     expect(
       decodeDecision(DecisionKind.admitted, Uint8List.fromList([0xff])),

@@ -1,6 +1,7 @@
 /// Deciding one event: whether it comes in, and where it goes.
 library;
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_journal/is_journal.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show DecidedBy;
 
@@ -51,8 +52,13 @@ Decision decide(
     );
   }
 
-  Admitted admit(Placement placement) =>
-      Admitted(event, by: by, reading: admissible, placement: placement);
+  Admitted admit(Placement placement, [JsonObject? rules]) => Admitted(
+    event,
+    by: by,
+    reading: admissible,
+    placement: placement,
+    rules: rules,
+  );
 
   switch (admissible) {
     case Changed(:final message):
@@ -78,32 +84,40 @@ Decision decide(
       };
     case Joined():
       return switch (_journey(admissible, decided, journeys)) {
-        final journey? => admit(IntoJourney(journey)),
+        (InJourney() && final journey, _) => admit(IntoJourney(journey)),
+        (final journey, final rules) => admit(IntoJourney(journey), rules),
         null => NotTakenIn(event, by: by, conversation: conversation, key: key),
       };
     case Said():
       final Placement placement;
+      JsonObject? rules;
       if (decided.journeyPathOf(conversation) case final path?) {
         placement = Under(path);
-      } else if (_journey(admissible, decided, journeys) case final journey?) {
+      } else if (_journey(admissible, decided, journeys)
+          case (final journey, final journeyRules)?) {
         placement = StartsJourneyPath(journey);
+        rules = journeyRules;
       } else {
         return NotTakenIn(event, by: by, conversation: conversation, key: key);
       }
       return turns.startsTurn(admissible, placement)
-          ? admit(placement)
+          ? admit(placement, rules)
           : NotATurn(event, by: by, conversation: conversation, key: key);
   }
 }
 
-/// The journey [first]'s conversation goes in: the journey of what it sits
-/// within (or of itself, when it sits within nothing) when that has
-/// started; a new one when [rule] takes it in; null when it doesn't.
-JourneyPlacement? _journey(
+/// The journey [first]'s conversation goes in, with its rules: the
+/// journey of what it sits within (or of itself, when it sits within
+/// nothing) when that has started; a new one when [rule] takes it in; null
+/// when it doesn't.
+(JourneyPlacement, JsonObject)? _journey(
   Admissible first,
   Decided decided,
   JourneyRule rule,
 ) => switch (decided.journeyOf(first.within ?? first.conversation)) {
-  final journey? => InJourney(journey),
-  null => rule.takesIn(first) ? const StartsJourney() : null,
+  final journey? => (InJourney(journey), decided.rulesOf(journey)),
+  null => switch (rule.takeIn(first)) {
+    final rules? => (const StartsJourney(), rules),
+    null => null,
+  },
 };

@@ -25,6 +25,7 @@
 /// event now.
 library;
 
+import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_journal/is_journal.dart' show EntryHash;
@@ -33,6 +34,7 @@ import 'package:is_shapes/is_shapes.dart'
     show ActorId, DecidedBy, JourneyId, JourneyPathId;
 
 import 'reading.dart';
+import 'rules.dart';
 
 /// The kinds of entry the docking station sends, one per event. Its user's
 /// row in the record's sender table allows these two and nothing else.
@@ -118,7 +120,8 @@ sealed class Decision {
 ///
 /// The entry, of kind `admitted`:
 ///
-///     {"event": <hex>, "by": <who>, "reading": <reading>, ...the placement}
+///     {"event": <hex>, "by": <who>, "reading": <reading>,
+///      ...the placement, "rules": <rules>?}
 ///
 /// `<reading>` is the whole reading, as [encodeReading] writes it (Nick,
 /// 16 Nov: the `admitted` entry carries the reading), so whatever hands the
@@ -129,19 +132,43 @@ sealed class Decision {
 /// `"journey": <id>` for [InJourney], or `"startsJourney": true` for
 /// [StartsJourney].
 ///
+/// [rules] are there exactly when the admission starts a journey or a
+/// journey path: the rules the journey was taken in under, as the
+/// [JourneyRule] gave them, copied into each path it starts. loop_launcher
+/// reads a path's rules from the entry that started it, and the airlock
+/// enforces them; the docking station passes them through unread.
+///
 /// The reading's [within] is kept so which journey an outside conversation
 /// is can be rebuilt from decisions alone; its [from], for rules about who
 /// starts turns, such as a cap on turns bots start.
 final class Admitted extends Decision {
-  const Admitted(
+  /// Throws an [ArgumentError] when [rules] are given for an admission
+  /// that starts nothing, or missing for one that starts something.
+  Admitted(
     super.event, {
     required super.by,
     required this.reading,
     required this.placement,
-  });
+    this.rules,
+  }) {
+    if ((rules != null) != starts(placement)) {
+      throw ArgumentError.value(
+        rules,
+        'rules',
+        'given exactly when the admission starts a journey or a path',
+      );
+    }
+  }
 
   final Admissible reading;
   final Placement placement;
+  final JsonObject? rules;
+
+  /// Whether [placement] starts a journey path or a journey.
+  static bool starts(Placement placement) => switch (placement) {
+    StartsJourneyPath() || IntoJourney(journey: StartsJourney()) => true,
+    Under() || IntoJourney(journey: InJourney()) => false,
+  };
 
   Conversation get conversation => reading.conversation;
   Conversation? get within => reading.within;

@@ -35,6 +35,7 @@ import 'reading_wire.dart';
         case IntoJourney(:final journey):
           _journey(json, journey);
       }
+      if (decision.rules case final rules?) json['rules'] = rules;
     case Declined():
       json['why'] = _why(decision);
       if (decision case DeclinedEvent(:final conversation, :final key)) {
@@ -127,8 +128,21 @@ Admitted? _admitted(EntryHash event, DecidedBy by, Map<String, Object?> json) {
       placement = IntoJourney(journey);
     }
   }
+  JsonObject? rules;
+  if (json.containsKey('rules')) {
+    rules = JsonObject.parse(json['rules']);
+    if (rules == null) return null;
+    fields.add('rules');
+  }
   if (json.length != fields.length) return null;
-  return Admitted(event, by: by, reading: reading, placement: placement);
+  if ((rules != null) != Admitted.starts(placement)) return null;
+  return Admitted(
+    event,
+    by: by,
+    reading: reading,
+    placement: placement,
+    rules: rules,
+  );
 }
 
 JourneyPlacement? _readJourney(Map<String, Object?> json, Set<String> fields) {
