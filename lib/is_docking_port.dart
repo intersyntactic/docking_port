@@ -9,10 +9,11 @@
 /// [Decision] recorded for each arrival, [Admitted] or [Declined], as
 /// [encodeDecision] writes it and [decodeDecision] reads it back; [decide],
 /// which makes one under the rules passed in, [JourneyRule] and [TurnRule];
-/// and [Decided], what the decisions add up to when read back.
+/// [Decided], what the decisions add up to when read back; and
+/// [runDockingPort], which follows the record and sends each decision to
+/// it.
 ///
-/// Not here yet: following the record and sending decisions to it, and
-/// handing an arrival to a journey path's apex.
+/// Not here yet: handing an arrival to a journey path's apex.
 library;
 
 export 'src/decide.dart';
@@ -21,3 +22,4 @@ export 'src/decision.dart';
 export 'src/decision_wire.dart';
 export 'src/reading.dart';
 export 'src/rules.dart';
+export 'src/run.dart';

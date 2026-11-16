@@ -10,6 +10,10 @@ environment:
   sdk: ^3.13.0
 
 dependencies:
+  agent_loop:
+    git:
+      url: https://github.com/intersyntactic/agent_loop.git
+      ref: 207690a
   is_annotation_shapes: ^0.2.1
   is_conversation_shapes: ^0.4.0
   is_journal: ^0.5.0
