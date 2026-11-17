@@ -435,7 +435,13 @@ void main() {
   });
 
   test('the start entry\'s kind is no event\'s or decision\'s', () async {
-    for (final kind in ['event', 'arrived', 'admitted', 'declined', 'ended']) {
+    for (final kind in [
+      'event',
+      'arrived',
+      'admitted',
+      'declined',
+      'journey-ended',
+    ]) {
       final record = _Record();
       await expectLater(
         runDockingStation(

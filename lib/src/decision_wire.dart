@@ -60,7 +60,7 @@ import 'reading_wire.dart';
   final kind = switch (decision) {
     EventAdmitted() => DecisionEntryKind.admitted,
     EventDeclined() => DecisionEntryKind.declined,
-    JourneyEnded() => DecisionEntryKind.ended,
+    JourneyEnded() => DecisionEntryKind.journeyEnded,
   };
   return (kind, Uint8List.fromList(utf8.encode(jsonEncode(json))));
 }
@@ -100,7 +100,7 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
   if (event == null || by == null) return null;
   if (kind == DecisionEntryKind.admitted) return _admitted(event, by, json);
   if (kind == DecisionEntryKind.declined) return _declined(event, by, json);
-  if (kind == DecisionEntryKind.ended) {
+  if (kind == DecisionEntryKind.journeyEnded) {
     final journey = _read(json['journey'], JourneyId.parse);
     if (journey == null || json.length != 3) return null;
     return JourneyEnded(event, by: by, journey: journey);

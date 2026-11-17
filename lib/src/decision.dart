@@ -45,12 +45,13 @@ abstract final class DecisionEntryKind {
   /// A [EventDeclined]'s kind.
   static final declined = Kind.parse('declined')!;
 
-  /// An [JourneyEnded]'s kind.
-  static final ended = Kind.parse('ended')!;
+  /// A [JourneyEnded]'s kind: the journal's own, since the journal reads
+  /// it to close the journey's chains.
+  static final journeyEnded = Kind.journeyEnded;
 
   /// Every kind above, as the docking station subscribes to its own
   /// decisions.
-  static final all = {admitted, declined, ended};
+  static final all = {admitted, declined, journeyEnded};
 }
 
 /// Where an admitted event goes. Something said, or a change, goes
@@ -231,7 +232,7 @@ final class EventAdmitted extends AdmissionDecision {
 /// What event ends one is not decided yet, so nothing decides one here; it
 /// is read back like any other decision.
 ///
-/// The entry, of kind `ended`:
+/// The entry, of kind `journey-ended`:
 ///
 ///     {"event": <hex>, "by": <who>, "journey": <id>}
 final class JourneyEnded extends AdmissionDecision {

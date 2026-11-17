@@ -341,10 +341,13 @@ void main() {
         DecisionEntryKind.declined,
         {'event': _a, 'why': 'no-reading-for-source'},
       ),
-      (DecisionEntryKind.ended, {'event': _a, 'by': 'rules'}),
-      (DecisionEntryKind.ended, {'event': _a, 'by': 'rules', 'journey': 'x'}),
+      (DecisionEntryKind.journeyEnded, {'event': _a, 'by': 'rules'}),
       (
-        DecisionEntryKind.ended,
+        DecisionEntryKind.journeyEnded,
+        {'event': _a, 'by': 'rules', 'journey': 'x'},
+      ),
+      (
+        DecisionEntryKind.journeyEnded,
         {'event': _a, 'by': 'rules', 'journey': _b, 'why': 'done'},
       ),
       (DecisionEntryKind.admitted, {'event': _a, 'by': 'rules', 'journey': _b}),
