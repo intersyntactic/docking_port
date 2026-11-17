@@ -18,7 +18,7 @@ dependencies:
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
-      ref: 46ad868485d9b63a9a8c7e401a3bcc9ab7ce0f35
+      ref: dfa33a15996a74f2be5e6049ab5fd013d3b14e6e
 
 dependency_overrides:
   # is_teams_module pins is_docking_station to a commit of its own; pub won't
@@ -26,9 +26,6 @@ dependency_overrides:
   # this package wins.
   is_docking_station:
     path: ..
-  # is_teams_module asks for is_shapes ^0.4.0 but uses neither renamed id,
-  # so it builds on 0.5.0. Drop this once it allows 0.5.0.
-  is_shapes: ^0.5.0
 
 dev_dependencies:
   is_conversation_shapes: ^0.8.2
