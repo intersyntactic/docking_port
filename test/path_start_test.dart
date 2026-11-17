@@ -1,8 +1,8 @@
-// readPathStart reads the `admitted` wire on its own, apart from
-// decodeDecision, so the airlock never decodes a reading. Two readers of
-// one wire can drift apart: this holds them together over every admitted
-// case the docking station writes, and holds the narrow reader as strict as
-// the full one everywhere outside `reading`.
+// readTrajectoryStart reads the `event-admitted-to-mission` wire on its own,
+// apart from decodeDecision, so the airlock never decodes a reading. Two
+// readers of one wire can drift apart: this holds them together over every
+// admitted case the docking station writes, and holds the narrow reader as
+// strict as the full one everywhere outside `reading`.
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -27,121 +27,137 @@ Uint8List _entry(AdmissionDecision decision, {String previous = '-'}) {
 Uint8List _raw(String kind, Map<String, Object?> json) =>
     Uint8List.fromList(utf8.encode('$kind\n-\n${jsonEncode(json)}'));
 
-AdmittedPathEntry<JsonObject> _read(Uint8List entry) =>
-    readPathStart(entry, rules: JsonObject.parse);
+AdmittedTrajectoryEntry<JsonObject> _read(Uint8List entry) =>
+    readTrajectoryStart(entry, rules: JsonObject.parse);
 
 void main() {
   test('agrees with decodeDecision on every admitted case', () {
-    final journey = JourneyId.parse(_b)!;
-    final path = JourneyPathId.parse(_c)!;
-    EventAdmitted admitted(
+    final mission = JourneyId.parse(_b)!;
+    final trajectory = JourneyPathId.parse(_c)!;
+    EventAdmittedToMission admitted(
       AdmissibleEvent reading,
       AdmittedPlacement placement, {
       bool startsTurn = true,
-    }) => EventAdmitted(
+    }) => EventAdmittedToMission(
       event,
       by: DecidedBy.person,
       reading: reading,
       placement: placement,
-      rules: EventAdmitted.starts(placement) ? rules : null,
+      rules: EventAdmittedToMission.starts(placement) ? rules : null,
       startsTurn: reading is MessageSaid ? startsTurn : null,
     );
     final decisions = [
       for (final reading in readings)
-        if (reading is ConversationJoined) ...[
-          admitted(reading, IntoJourney(InJourney(journey))),
-          admitted(reading, const IntoJourney(StartsJourney())),
+        if (reading is ActorsJoinedAddress) ...[
+          admitted(reading, IntoMission(InMission(mission))),
+          admitted(reading, const IntoMission(StartsMission())),
         ] else
-          admitted(reading, UnderJourneyPath(path)),
-      admitted(said, UnderJourneyPath(path), startsTurn: false),
-      admitted(said, StartsJourneyPath(InJourney(journey))),
-      admitted(said, const StartsJourneyPath(StartsJourney())),
+          admitted(reading, OnTrajectory(trajectory)),
+      admitted(said, OnTrajectory(trajectory), startsTurn: false),
+      admitted(said, StartsTrajectory(InMission(mission))),
+      admitted(said, const StartsTrajectory(StartsMission())),
     ];
     for (final decision in decisions) {
       final entry = _entry(decision);
       final full = decodeDecision(
-        DecisionEntryKind.admitted,
+        DecisionEntryKind.eventAdmittedToMission,
         encodeDecision(decision).$2,
       )!;
       final narrow = _read(entry);
-      switch ((full as EventAdmitted).placement) {
-        case StartsJourneyPath(journey: final placement):
-          final starts = narrow as StartsPath<JsonObject>;
+      switch ((full as EventAdmittedToMission).placement) {
+        case StartsTrajectory(mission: final placement):
+          final starts = narrow as EntryStartsTrajectory<JsonObject>;
           expect(starts.event, full.event);
           expect(starts.by, full.by);
-          expect(starts.path, JourneyPathId.of(entry));
-          expect(starts.journey, switch (placement) {
-            InJourney(:final journey) => journey,
-            StartsJourney() => JourneyId.of(entry),
+          expect(starts.trajectory, JourneyPathId.of(entry));
+          expect(starts.mission, switch (placement) {
+            InMission(:final mission) => mission,
+            StartsMission() => JourneyId.of(entry),
           });
           expect(starts.rules.asUncheckedMap(), full.rules!.asUncheckedMap());
         case _:
-          expect(narrow, isA<StartsNoPath<JsonObject>>(), reason: '$full');
+          expect(
+            narrow,
+            isA<EntryStartsNoTrajectory<JsonObject>>(),
+            reason: '$full',
+          );
       }
     }
   });
 
-  test('a path is named by the whole entry, header included', () {
-    final decision = EventAdmitted(
+  test('a trajectory is named by the whole entry, header included', () {
+    final decision = EventAdmittedToMission(
       event,
       by: DecidedBy.rules,
       reading: said,
-      placement: const StartsJourneyPath(StartsJourney()),
+      placement: const StartsTrajectory(StartsMission()),
       rules: rules,
       startsTurn: true,
     );
-    final a = _read(_entry(decision)) as StartsPath;
-    final b = _read(_entry(decision, previous: _b)) as StartsPath;
-    expect(a.path, isNot(b.path));
+    final a = _read(_entry(decision)) as EntryStartsTrajectory;
+    final b = _read(_entry(decision, previous: _b)) as EntryStartsTrajectory;
+    expect(a.trajectory, isNot(b.trajectory));
   });
 
-  test('anything else is unreadable, never no path', () {
+  test('anything else is unreadable, never no trajectory', () {
     final good = {
       'event': 'a' * 64,
       'by': 'rules',
       'reading': {'case': 'message-said', 'node': 'never decoded'},
-      'startsJourneyPath': true,
-      'startsJourney': true,
+      'startsTrajectory': true,
+      'startsMission': true,
       'rules': {'tools': 'all'},
       'startsTurn': true,
     };
-    expect(_read(_raw('admitted', good)), isA<StartsPath<JsonObject>>());
-    final under = {...good, 'journeyPath': _c}
-      ..remove('startsJourneyPath')
-      ..remove('startsJourney')
+    expect(
+      _read(_raw('event-admitted-to-mission', good)),
+      isA<EntryStartsTrajectory<JsonObject>>(),
+    );
+    final under = {...good, 'trajectory': _c}
+      ..remove('startsTrajectory')
+      ..remove('startsMission')
       ..remove('rules');
-    expect(_read(_raw('admitted', under)), isA<StartsNoPath<JsonObject>>());
+    expect(
+      _read(_raw('event-admitted-to-mission', under)),
+      isA<EntryStartsNoTrajectory<JsonObject>>(),
+    );
 
     final bad = <Uint8List>[
-      Uint8List.fromList(utf8.encode('admitted')),
-      _raw('declined', good),
-      _raw('admitted', {...good, 'extra': 1}),
-      _raw('admitted', {...good, 'event': 'x'}),
-      _raw('admitted', {...good, 'by': 'nobody'}),
-      _raw('admitted', {...good, 'reading': 'message-said'}),
-      _raw('admitted', {...good, 'reading': <String, Object?>{}}),
-      _raw('admitted', {...good}..remove('rules')),
-      _raw('admitted', {...good, 'rules': 'all'}),
-      _raw('admitted', {
+      Uint8List.fromList(utf8.encode('event-admitted-to-mission')),
+      _raw('event-not-admitted-to-mission', good),
+      _raw('event-admitted-to-mission', {...good, 'extra': 1}),
+      _raw('event-admitted-to-mission', {...good, 'event': 'x'}),
+      _raw('event-admitted-to-mission', {...good, 'by': 'nobody'}),
+      _raw('event-admitted-to-mission', {...good, 'reading': 'message-said'}),
+      _raw('event-admitted-to-mission', {
+        ...good,
+        'reading': <String, Object?>{},
+      }),
+      _raw('event-admitted-to-mission', {...good}..remove('rules')),
+      _raw('event-admitted-to-mission', {...good, 'rules': 'all'}),
+      _raw('event-admitted-to-mission', {
         ...under,
         'rules': {'tools': 'all'},
       }),
-      _raw('admitted', {...good}..remove('startsTurn')),
-      _raw('admitted', {...good, 'startsTurn': 'yes'}),
-      _raw('admitted', {...good, 'startsTurn': false}),
-      _raw('admitted', {
+      _raw('event-admitted-to-mission', {...good}..remove('startsTurn')),
+      _raw('event-admitted-to-mission', {...good, 'startsTurn': 'yes'}),
+      _raw('event-admitted-to-mission', {...good, 'startsTurn': false}),
+      _raw('event-admitted-to-mission', {
         ...good,
-        'reading': {'case': 'conversation-joined'},
+        'reading': {'case': 'actors-joined-address'},
       }),
-      _raw('admitted', {...good, 'journey': _b}),
-      _raw('admitted', {...good, 'startsJourneyPath': 1}),
-      _raw('admitted', {...under, 'journeyPath': 'x'}),
-      Uint8List.fromList([...utf8.encode('admitted\n-\n'), 0xff]),
+      _raw('event-admitted-to-mission', {...good, 'mission': _b}),
+      _raw('event-admitted-to-mission', {...good, 'startsTrajectory': 1}),
+      _raw('event-admitted-to-mission', {...under, 'trajectory': 'x'}),
+      Uint8List.fromList([
+        ...utf8.encode('event-admitted-to-mission\n-\n'),
+        0xff,
+      ]),
     ];
     for (final entry in bad) {
       expect(
         _read(entry),
-        isA<UnreadablePathEntry<JsonObject>>(),
+        isA<UnreadableTrajectoryEntry<JsonObject>>(),
         reason: utf8.decode(entry, allowMalformed: true),
       );
     }

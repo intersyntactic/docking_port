@@ -38,7 +38,7 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 /// Each event is read by the one of [readings] for its source, in the
 /// record's order, and each decision is taken into a [DecidedSoFar]. Once
 /// the subscription has caught up, each event after the start entry with no
-/// decision is decided under [journeys] and [turns], in order, and sent with
+/// decision is decided under [missions] and [turns], in order, and sent with
 /// [send], naming the decision before it as previous, or the start entry for
 /// the first; so is each event after that, as it comes. [subscribe] and
 /// [send] are a `JournalReader`'s and a `JournalWriter`'s, or stand-ins.
@@ -71,7 +71,7 @@ Future<void> runDockingStation({
   send,
   required Kind startKind,
   required Iterable<ModuleReading<Object?>> readings,
-  required JourneyRule journeys,
+  required JourneyRule missions,
   required TurnRule turns,
 }) async {
   final folds = <String, _Fold<Object?>>{};
@@ -109,7 +109,7 @@ Future<void> runDockingStation({
         event,
         reading,
         decided,
-        journeys: journeys,
+        missions: missions,
         turns: turns,
       );
       final (kind, body) = encodeDecision(decision);

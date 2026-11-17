@@ -13,7 +13,7 @@ import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy;
 import 'package:test/test.dart';
 
 final ann = ActorId.parse('teams:t/p')!;
-final chat = ConversationId.parse('test:chat')!;
+final chat = AddressInExternalSystem.parse('test:chat')!;
 
 /// The start entry's kind in these tests. The real one is the service's to
 /// name, so the runner is given it.
@@ -160,8 +160,8 @@ final class _Reading implements ModuleReading<int> {
       return (
         state + 1,
         MessageSaid(
-          conversation: chat,
-          within: null,
+          addressInExternalSystem: chat,
+          containingAddress: null,
           key: EventKey.parse(key)!,
           node: UserSaid(
             author: ann,
@@ -195,7 +195,7 @@ Future<void> _run(_Record record, _Reading reading) => runDockingStation(
   send: record.send,
   startKind: Kind.parse(_startKind)!,
   readings: [reading],
-  journeys: const _TakesIn(),
+  missions: const _TakesIn(),
   turns: const _EverySaid(),
 );
 
@@ -208,23 +208,24 @@ Future<void> _runToEnd(_Record record, _Reading reading) async {
   await running;
 }
 
-EventAdmitted _startsChat(EntryHash event, String key) => EventAdmitted(
-  event,
-  by: DecidedBy.rules,
-  reading: MessageSaid(
-    conversation: chat,
-    within: null,
-    key: EventKey.parse(key)!,
-    node: UserSaid(
-      author: ann,
-      source: SourceMessageId.parse('chat|$key')!,
-      text: 'hi',
-    ),
-  ),
-  placement: const StartsJourneyPath(StartsJourney()),
-  rules: const JsonObject.of({'tools': 'all'}),
-  startsTurn: true,
-);
+EventAdmittedToMission _startsChat(EntryHash event, String key) =>
+    EventAdmittedToMission(
+      event,
+      by: DecidedBy.rules,
+      reading: MessageSaid(
+        addressInExternalSystem: chat,
+        containingAddress: null,
+        key: EventKey.parse(key)!,
+        node: UserSaid(
+          author: ann,
+          source: SourceMessageId.parse('chat|$key')!,
+          text: 'hi',
+        ),
+      ),
+      placement: const StartsTrajectory(StartsMission()),
+      rules: const JsonObject.of({'tools': 'all'}),
+      startsTurn: true,
+    );
 
 void main() {
   test('once caught up, decides each waiting event, each naming the '
@@ -240,17 +241,19 @@ void main() {
     expect(first.event, a.hash);
     expect(first.by, DecidedBy.rules);
     expect(
-      (first as EventAdmitted).placement,
-      isA<StartsJourneyPath>().having(
-        (p) => p.journey,
-        'journey',
-        isA<StartsJourney>(),
+      (first as EventAdmittedToMission).placement,
+      isA<StartsTrajectory>().having(
+        (p) => p.mission,
+        'mission',
+        isA<StartsMission>(),
       ),
     );
     expect(secondPrevious, firstEntry);
     expect(second.event, b.hash);
     expect(
-      ((second as EventAdmitted).placement as UnderJourneyPath).journeyPath.hex,
+      ((second as EventAdmittedToMission).placement as OnTrajectory)
+          .trajectory
+          .hex,
       firstEntry.hex,
     );
   });
@@ -270,8 +273,8 @@ void main() {
     expect(previous, aDecision);
     expect(decision.event, b.hash);
     expect(
-      ((decision as EventAdmitted).placement as UnderJourneyPath)
-          .journeyPath
+      ((decision as EventAdmittedToMission).placement as OnTrajectory)
+          .trajectory
           .hex,
       aDecision.hex,
     );
@@ -303,7 +306,7 @@ void main() {
       SaidStartsNoTurn(
         a.hash,
         by: DecidedBy.rules,
-        conversation: chat,
+        addressInExternalSystem: chat,
         key: EventKey.parse('a')!,
       ),
     );
@@ -315,7 +318,10 @@ void main() {
   });
 
   for (final (what, answer) in [
-    ('a refusal', const WriteRefused('kind-not-allowed admitted')),
+    (
+      'a refusal',
+      const WriteRefused('kind-not-allowed event-admitted-to-mission'),
+    ),
     ('a failed add', const WriteFailed('disk full')),
     ('no answer', const Unanswered('closed before answering')),
   ]) {
@@ -334,26 +340,33 @@ void main() {
 
   test('a decision it cannot read stops it', () async {
     final record = _Record();
-    record.add('admitted', null, utf8.encode('{"not": "a decision"}'));
+    record.add(
+      'event-admitted-to-mission',
+      null,
+      utf8.encode('{"not": "a decision"}'),
+    );
 
     await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
     await record.close();
   });
 
-  test('an event from a source no reading takes is declined, unread', () async {
-    final record = _Record();
-    final x = record.recordEvent({
-      'said': 'hi',
-      'key': 'x',
-    }, source: 'elsewhere');
-    final reading = _Reading();
-    await _runToEnd(record, reading);
+  test(
+    'an event from a source no reading takes is not admitted, unread',
+    () async {
+      final record = _Record();
+      final x = record.recordEvent({
+        'said': 'hi',
+        'key': 'x',
+      }, source: 'elsewhere');
+      final reading = _Reading();
+      await _runToEnd(record, reading);
 
-    final [(_, decision)] = record.sent;
-    expect(decision, isA<NoReadingForSource>());
-    expect(decision.event, x.hash);
-    expect(reading.given, isEmpty);
-  });
+      final [(_, decision)] = record.sent;
+      expect(decision, isA<NoReadingForSource>());
+      expect(decision.event, x.hash);
+      expect(reading.given, isEmpty);
+    },
+  );
 
   test('reads an event recorded before the rename, as `arrived`', () async {
     final record = _Record();
@@ -435,7 +448,13 @@ void main() {
   });
 
   test('the start entry\'s kind is no event\'s or decision\'s', () async {
-    for (final kind in ['event', 'arrived', 'admitted', 'declined', 'ended']) {
+    for (final kind in [
+      'event',
+      'arrived',
+      'event-admitted-to-mission',
+      'event-not-admitted-to-mission',
+      'mission-ended',
+    ]) {
       final record = _Record();
       await expectLater(
         runDockingStation(
@@ -443,7 +462,7 @@ void main() {
           send: record.send,
           startKind: Kind.parse(kind)!,
           readings: [_Reading()],
-          journeys: const _TakesIn(),
+          missions: const _TakesIn(),
           turns: const _EverySaid(),
         ),
         throwsA(isA<ArgumentError>()),

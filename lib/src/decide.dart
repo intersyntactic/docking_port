@@ -17,10 +17,10 @@ import 'rules.dart';
 ///
 /// In order: an event whose key was decided already is a [DuplicateEvent]. A
 /// change goes where the message it changes went, and a verdict under its
-/// conversation's journey path. A join goes into its journey, and
-/// something said under its conversation's journey path, marked with
+/// address's trajectory. A join goes into its mission, and
+/// something said under its address's trajectory, marked with
 /// whether the turn rule says it starts a turn, or under a new one when it
-/// does. A journey not yet started is started only when [journeys] takes
+/// does. A mission not yet started is started only when [missions] takes
 /// it in.
 ///
 /// Every decision it makes is [DecidedBy.rules]: nothing here asks the
@@ -29,7 +29,7 @@ AdmissionDecision decide(
   EntryHash event,
   EventReading? reading,
   DecidedSoFar decided, {
-  required JourneyRule journeys,
+  required JourneyRule missions,
   required TurnRule turns,
 }) {
   const by = DecidedBy.rules;
@@ -42,22 +42,22 @@ AdmissionDecision decide(
     case AdmissibleEvent():
       admissible = reading;
   }
-  final AdmissibleEvent(:conversation, :key) = admissible;
-  if (decided.decidedAt(conversation, key) case final first?) {
+  final AdmissibleEvent(:addressInExternalSystem, :key) = admissible;
+  if (decided.decidedAt(addressInExternalSystem, key) case final first?) {
     return DuplicateEvent(
       event,
       by: by,
-      conversation: conversation,
+      addressInExternalSystem: addressInExternalSystem,
       key: key,
       of: first,
     );
   }
 
-  EventAdmitted admit(
+  EventAdmittedToMission admit(
     AdmittedPlacement placement, {
     JsonObject? rules,
     bool? startsTurn,
-  }) => EventAdmitted(
+  }) => EventAdmittedToMission(
     event,
     by: by,
     reading: admissible,
@@ -68,66 +68,70 @@ AdmissionDecision decide(
 
   switch (admissible) {
     case MessageChanged(:final message):
-      return switch (decided.journeyPathOfMessage(conversation, message)) {
-        final path? => admit(UnderJourneyPath(path)),
+      return switch (decided.trajectoryOfMessage(
+        addressInExternalSystem,
+        message,
+      )) {
+        final trajectory? => admit(OnTrajectory(trajectory)),
         null => ChangeToUnadmittedMessage(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
           message: message,
         ),
       };
     case ShownMessageJudged():
-      return switch (decided.journeyPathOf(conversation)) {
-        final path? => admit(UnderJourneyPath(path)),
-        null => ShownMessageJudgedUnplaced(
+      return switch (decided.trajectoryOf(addressInExternalSystem)) {
+        final trajectory? => admit(OnTrajectory(trajectory)),
+        null => JudgedMessageHasNoTrajectory(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         ),
       };
-    case ConversationJoined():
-      return switch (_journey(admissible, decided, journeys)) {
-        (InJourney() && final journey, _) => admit(IntoJourney(journey)),
-        (final journey, final rules) => admit(
-          IntoJourney(journey),
+    case ActorsJoinedAddress():
+      return switch (_mission(admissible, decided, missions)) {
+        (InMission() && final mission, _) => admit(IntoMission(mission)),
+        (final mission, final rules) => admit(
+          IntoMission(mission),
           rules: rules,
         ),
-        null => ConversationNotTakenIn(
+        null => AddressNotAdmittedToMission(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         ),
       };
     case MessageSaid():
       final AdmittedPlacement placement;
       JsonObject? rules;
-      if (decided.journeyPathOf(conversation) case final path?) {
-        placement = UnderJourneyPath(path);
-      } else if (_journey(admissible, decided, journeys)
-          case (final journey, final journeyRules)?) {
-        placement = StartsJourneyPath(journey);
-        rules = journeyRules;
+      if (decided.trajectoryOf(addressInExternalSystem)
+          case final trajectory?) {
+        placement = OnTrajectory(trajectory);
+      } else if (_mission(admissible, decided, missions)
+          case (final mission, final missionRules)?) {
+        placement = StartsTrajectory(mission);
+        rules = missionRules;
       } else {
-        return ConversationNotTakenIn(
+        return AddressNotAdmittedToMission(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         );
       }
       final startsTurn = turns.startsTurn(admissible, placement);
-      // Something said that starts no turn still goes under a path that
-      // has started, as context; it never starts one, since a path brings
+      // Something said that starts no turn still goes under a trajectory that
+      // has started, as context; it never starts one, since a trajectory brings
       // up an agent loop with nothing to answer.
-      if (!startsTurn && placement is StartsJourneyPath) {
+      if (!startsTurn && placement is StartsTrajectory) {
         return SaidStartsNoTurn(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         );
       }
@@ -135,18 +139,20 @@ AdmissionDecision decide(
   }
 }
 
-/// The journey [first]'s conversation goes in, with its rules: the
-/// journey of what it sits within (or of itself, when it sits within
+/// The mission [first]'s address goes in, with its rules: the
+/// mission of what it sits within (or of itself, when it sits within
 /// nothing) when that has started; a new one when [rule] takes it in; null
 /// when it doesn't.
-(JourneyPlacement, JsonObject)? _journey(
+(MissionPlacement, JsonObject)? _mission(
   AdmissibleEvent first,
   DecidedSoFar decided,
   JourneyRule rule,
-) => switch (decided.journeyOf(first.within ?? first.conversation)) {
-  final journey? => (InJourney(journey), decided.rulesOf(journey)),
+) => switch (decided.missionOf(
+  first.containingAddress ?? first.addressInExternalSystem,
+)) {
+  final mission? => (InMission(mission), decided.rulesOf(mission)),
   null => switch (rule.takeIn(first)) {
-    final rules? => (const StartsJourney(), rules),
+    final rules? => (const StartsMission(), rules),
     null => null,
   },
 };

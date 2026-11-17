@@ -1,7 +1,7 @@
 # is_docking_station
 
-The docking station is the core piece that lets the outside world into journey
-paths. Something outside, such as Teams, sends bytes unasked. Its relay keeps
+The docking station is the core piece that lets the outside world into
+trajectories. Something outside, such as Teams, sends bytes unasked. Its relay keeps
 them in the record exactly as they came, as an *event*. The docking station
 reads events from the record in order and decides, for each one, whether it
 comes in and where it goes.
@@ -11,9 +11,9 @@ renamed them on 16 Nov ("It's an event, not an arrival"), and entries
 written before then keep the kind `arrived` for good: an entry's kind is
 part of the bytes its hash is taken from. So the docking station reads both.
 
-It is the airlock's opposite. The airlock decides what leaves a journey path
+It is the airlock's opposite. The airlock decides what leaves a trajectory
 for the world. The docking station decides what comes into one. On the way back,
-the docking station only says which conversation an answer goes to. Sending the
+the docking station only says which address an answer goes to. Sending the
 answer is an effect, so the airlock decides that.
 
 The rules behind it are in intersyntactic's RULINGS ("The docking station admits
@@ -38,10 +38,10 @@ same events in the same order.
 
 For each event, the reading names:
 
-- **the conversation** it belongs to, such as a Teams chat or a thread in a
+- **the address** it belongs to, such as a Teams chat or a thread in a
   channel. It's written like an actor id, `teams:…`, so two modules can never
-  name two conversations alike.
-- **what that conversation sits within**, such as the channel a thread is in,
+  name two addresses alike.
+- **what that address sits within**, such as the channel a thread is in,
   or nothing, for a chat or for a channel itself. This is how threads are
   grouped (below), without the docking station ever reading a module's ids.
 - **who it comes from**, as an `ActorId`, or no one.
@@ -58,61 +58,76 @@ For each event, the reading names:
 ## The cases
 
 - **Message said** (`MessageSaid`): something said. It carries the `UserSaid`
-  the journey path appends, because only the reading holds what building one
+  the trajectory appends, because only the reading holds what building one
   takes, such as a quote's author from earlier events. Something said always
   names who said it, since a `UserSaid` must have an author. So a message the
   module can't attribute is *nothing to admit*, never admitted unattributed.
 - **Message changed** (`MessageChanged`): an edit, delete or restore of an
   earlier message, in the message's terms, carrying what the message became as
   conversation_shapes' `WhatChanged`: `Edited` (what it says now), `Deleted` or
-  `Restored`. The journey path's agent loop makes the node for it, a
+  `Restored`. The trajectory's agent loop makes the node for it, a
   `UserSaidChanged`, because that node points at the turn the message became,
   and only the loop knows that turn. A module never learns turns. A change
   counts only when it comes from whoever said the message (Nick, 16 Nov), and
   whatever reads it applies that, so the docking station admits it whoever made
   it.
-- **Conversation joined** (`ConversationJoined`): people or the agent joined a
-  conversation. Never empty: a join of no one is nothing to admit.
+- **Actors joined an address** (`ActorsJoinedAddress`): people or the agent
+  joined an address. Never empty: a join of no one is nothing to admit.
 - **Shown message judged** (`ShownMessageJudged`): a person's verdict on
   something the agent showed them, such as Approve, Not yet or a proposed
   correction on a card. It is named for what it says, not for the button: a
   Slack button would be the same thing. It names the message judged, and the
   verdict as is_annotation_shapes' `VerdictOnShownMessage`: `ApprovedVerdict`,
-  `HeldOffVerdict` or `ProposedCorrectionVerdict`. As with a change, the journey
-  path's agent loop builds the annotation (a `NodeApproval`, a `NodeSeenMark`, a
+  `HeldOffVerdict` or `ProposedCorrectionVerdict`. As with a change, the
+  trajectory's agent loop builds the annotation (a `NodeApproval`, a `NodeSeenMark`, a
   `NodeCorrection`) once it knows which turn the message showed. A verdict
   always names who gave it, since a verdict from no one approves nothing.
 - **Nothing to admit** (`NothingToAdmit`): a typing indicator, a reaction the
   module doesn't carry, anything it can't read.
 
 Whether something said starts a turn is not the reading's call. The docking
-station decides that, under the journey path's rules.
+station decides that, under the trajectory's rules.
 
-## Journeys and journey paths
+## Missions and trajectories
 
-An outside conversation that holds threads, such as a Teams channel, is a
-*journey*, and each of its threads is one of that journey's *journey paths*.
-A conversation with no threads, such as a chat, is a journey with one journey
-path. It's the shape the core already has: a journey holds the people working
-in it and its journey paths, and a journey path is one agent's thread.
+An address in an external system that holds threads, such as a Teams
+channel, is a *mission*, and each of its threads is one of that mission's
+*trajectories*. An address with no threads, such as a chat, is a mission with
+one trajectory. It's the shape the core already has: a mission holds the
+people working in it and its trajectories, and a trajectory is one agent's
+line of turns. (Nick named them journeys and journey paths on 15 Nov and
+renamed them missions and trajectories on 17 Nov.)
 
-A journey starts with the first thread admitted under it. It needs no join of
-its own: an event from a conversation already shows the agent is in it. A
-join is kept in the journey of the conversation it comes from, even when it
+What the docking station writes for each event, and the words in it:
+
+| Entry kind | When |
+|---|---|
+| `event-admitted-to-mission` | The event comes in, on a trajectory or into a mission |
+| `event-not-admitted-to-mission` | It stays out; `why` says which case |
+| `mission-ended` | A mission is over, and the journal closes its chains |
+
+The start entry, `docking-station-set-up`, is written once at setup by
+infra's `record-setup` user, never by the docking station. A reading carries
+`addressInExternalSystem` and, when it sits inside another,
+`containingAddress`.
+
+A mission starts with the first thread admitted under it. It needs no join of
+its own: an event from an address already shows the agent is in it. A
+join is kept in the mission of the address it comes from, even when it
 means more, as a Teams join does when the agent is added to a whole team.
 How Teams sends that is Teams' business, so it's in teams_module's README.
 
 ## What a module never does
 
-A module never composes journey paths, never keeps which conversation is
-under which journey path, and never runs an agent loop. Working with many
-journey paths is the core's job, so every module that brings conversations in
+A module never composes trajectories, never keeps which address is
+under which trajectory, and never runs an agent loop. Working with many
+trajectories is the core's job, so every module that brings addresses in
 uses the same one.
 
 ## Where it stands
 
 - **Built:** the reading contract: `RelayedEvent`, `ModuleReading`,
-  `EventReading` and its cases, `ConversationId`, `EventKey`. Admission,
+  `EventReading` and its cases, `AddressInExternalSystem`, `EventKey`. Admission,
   meaning the decision recorded for each event, the rules passed in, and
   rebuilding from the record
   (https://github.com/intersyntactic/docking_station/pull/2,
@@ -126,4 +141,4 @@ uses the same one.
   (https://github.com/intersyntactic/docking_station/pull/14).
 - **Not yet:** the service that runs it on a machine, with a real
   `JournalReader` and `JournalWriter`.
-- **Coming:** handing admitted events to a journey path's agent loop.
+- **Coming:** handing admitted events to a trajectory's agent loop.

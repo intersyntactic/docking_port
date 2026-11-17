@@ -6,7 +6,7 @@
 /// [ModuleReading] every event from the module's relay, in the record's
 /// order, and for each the reading says what it is: a [EventReading]. The
 /// docking station never reads a module's bytes itself, and the module never
-/// learns which journey path anything went to.
+/// learns which trajectory anything went to.
 library;
 
 import 'dart:convert';
@@ -99,8 +99,8 @@ abstract interface class ModuleReading<S> {
 }
 
 /// What one event is: something said ([MessageSaid]), a change to an
-/// earlier message ([MessageChanged]), a conversation joined
-/// ([ConversationJoined]), a person's verdict on something the agent showed
+/// earlier message ([MessageChanged]), an address joined
+/// ([ActorsJoinedAddress]), a person's verdict on something the agent showed
 /// ([ShownMessageJudged]), or nothing to admit ([NothingToAdmit]).
 sealed class EventReading {
   const EventReading();
@@ -116,36 +116,37 @@ final class NothingToAdmit extends EventReading {
 /// whether to.
 sealed class AdmissibleEvent extends EventReading {
   const AdmissibleEvent({
-    required this.conversation,
-    required this.within,
+    required this.addressInExternalSystem,
+    required this.containingAddress,
     required this.key,
   });
 
-  /// The outside conversation it belongs to.
-  final ConversationId conversation;
+  /// The address in an external system it belongs to.
+  final AddressInExternalSystem addressInExternalSystem;
 
-  /// The conversation [conversation] sits inside, such as the channel a
+  /// The address [addressInExternalSystem] sits inside, such as the channel a
   /// thread is in. Null when it sits inside none, as a chat or a channel
   /// itself does.
   ///
-  /// It is what the outside groups its conversations by: a channel is a
-  /// journey and each of its threads a journey path (Nick, 2026-11-15:
-  /// "channel = journey, thread = journey path"). The reading names it so
+  /// It is what the outside groups its addresses by: a channel is a
+  /// mission and each of its threads a trajectory (Nick, 2026-11-15:
+  /// "channel = journey, thread = journey path", since renamed mission and
+  /// trajectory). The reading names it so
   /// the docking station never reads a module's ids to find it.
-  final ConversationId? within;
+  final AddressInExternalSystem? containingAddress;
 
   /// Who it comes from, or null for no one the module can name.
   ActorId? get from;
 
-  /// What "not admitted twice" compares, within [conversation]: the same
-  /// for two events that record one thing, as a redelivery does, and
+  /// What "not admitted twice" compares, within [addressInExternalSystem]: the
+  /// same for two events that record one thing, as a redelivery does, and
   /// different for two things, including two changes to one message.
   final EventKey key;
 }
 
-/// Something said, as [node], the node the journey path's apex appends.
+/// Something said, as [node], the node the trajectory's apex appends.
 /// Whether it starts a turn is the docking station's decision, under the
-/// journey path's rules.
+/// trajectory's rules.
 ///
 /// The reading builds [node] because only its fold holds what that takes,
 /// such as who wrote a message it quotes (Nick, 2026-11-15: the reading
@@ -153,8 +154,8 @@ sealed class AdmissibleEvent extends EventReading {
 /// can admit, since a [UserSaid] always has an author.
 final class MessageSaid extends AdmissibleEvent {
   const MessageSaid({
-    required super.conversation,
-    required super.within,
+    required super.addressInExternalSystem,
+    required super.containingAddress,
     required super.key,
     required this.node,
   });
@@ -177,8 +178,8 @@ final class MessageSaid extends AdmissibleEvent {
 /// Nov, the rule `Withdrawal` keeps).
 final class MessageChanged extends AdmissibleEvent {
   const MessageChanged({
-    required super.conversation,
-    required super.within,
+    required super.addressInExternalSystem,
+    required super.containingAddress,
     required this.from,
     required super.key,
     required this.message,
@@ -196,11 +197,11 @@ final class MessageChanged extends AdmissibleEvent {
   final WhatChanged change;
 }
 
-/// [joiners] joined [conversation]. One event may bring in several.
-final class ConversationJoined extends AdmissibleEvent {
-  const ConversationJoined._({
-    required super.conversation,
-    required super.within,
+/// [joiners] joined [addressInExternalSystem]. One event may bring in several.
+final class ActorsJoinedAddress extends AdmissibleEvent {
+  const ActorsJoinedAddress._({
+    required super.addressInExternalSystem,
+    required super.containingAddress,
     required this.from,
     required super.key,
     required this.joiners,
@@ -214,18 +215,18 @@ final class ConversationJoined extends AdmissibleEvent {
 
   /// A join of [joiners]; null when there are none, which is
   /// [NothingToAdmit].
-  static ConversationJoined? of({
-    required ConversationId conversation,
-    required ConversationId? within,
+  static ActorsJoinedAddress? of({
+    required AddressInExternalSystem addressInExternalSystem,
+    required AddressInExternalSystem? containingAddress,
     required ActorId? from,
     required EventKey key,
     required Iterable<ActorId> joiners,
   }) {
     final list = List<ActorId>.unmodifiable(joiners);
     if (list.isEmpty) return null;
-    return ConversationJoined._(
-      conversation: conversation,
-      within: within,
+    return ActorsJoinedAddress._(
+      addressInExternalSystem: addressInExternalSystem,
+      containingAddress: containingAddress,
       from: from,
       key: key,
       joiners: list,
@@ -238,14 +239,14 @@ final class ConversationJoined extends AdmissibleEvent {
 /// named `Judged`, then `ShownMessageJudged`, 16 Nov). Named for what the
 /// person said, not for the button, so a Slack button reads the same.
 ///
-/// It names the message, never a turn: the journey path's apex builds the
+/// It names the message, never a turn: the trajectory's apex builds the
 /// annotation, a `NodeApproval`, a `NodeSeenMark` or a `NodeCorrection`,
 /// once it knows which turn [to] showed. A verdict always names who gave
 /// it, since a verdict from no one approves nothing.
 final class ShownMessageJudged extends AdmissibleEvent {
   const ShownMessageJudged({
-    required super.conversation,
-    required super.within,
+    required super.addressInExternalSystem,
+    required super.containingAddress,
     required this.from,
     required super.key,
     required this.to,
@@ -261,29 +262,29 @@ final class ShownMessageJudged extends AdmissibleEvent {
   final VerdictOnShownMessage verdict;
 }
 
-/// An outside conversation: a Teams chat, channel or channel thread, a
-/// Slack channel. The docking station keeps each one under a journey path,
-/// and one that others sit inside, such as a channel, as a journey.
+/// An address in an external system: a Teams chat, channel or channel thread, a
+/// Slack channel. The docking station keeps each one under a trajectory,
+/// and one that others sit inside, such as a channel, as a mission.
 ///
 /// Written like an [ActorId], a source, a colon and the rest, such as
-/// `teams:19:abc@thread.v2`, so two modules never name two conversations
+/// `teams:19:abc@thread.v2`, so two modules never name two addresses
 /// alike.
-final class ConversationId {
-  const ConversationId._(this.value);
+final class AddressInExternalSystem {
+  const AddressInExternalSystem._(this.value);
 
   /// The id, as text.
   final String value;
 
-  /// [s] as a conversation; null unless it is a source, a colon, and the
+  /// [s] as an address; null unless it is a source, a colon, and the
   /// rest, with the rest printable ASCII and no spaces.
-  static ConversationId? parse(String s) =>
-      _id.hasMatch(s) ? ConversationId._(s) : null;
+  static AddressInExternalSystem? parse(String s) =>
+      _id.hasMatch(s) ? AddressInExternalSystem._(s) : null;
 
   static final _id = RegExp(r'^[a-z][a-z0-9-]*:[\x21-\x7e]+$');
 
   @override
   bool operator ==(Object other) =>
-      other is ConversationId && other.value == value;
+      other is AddressInExternalSystem && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -292,7 +293,7 @@ final class ConversationId {
   String toString() => value;
 }
 
-/// One event's key within its conversation, in the module's own terms. Not
+/// One event's key within its address, in the module's own terms. Not
 /// a message's id: an edit is a second event about the same message.
 final class EventKey {
   const EventKey._(this.value);
