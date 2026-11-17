@@ -13,7 +13,7 @@ import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_logbook/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
-    show ActorId, DecidedBy, JourneyId, JourneyPathId;
+    show ActorId, DecidedBy, MissionId, TrajectoryId;
 import 'package:test/test.dart';
 
 final _a = 'a' * 64, _b = 'b' * 64, _c = 'c' * 64;
@@ -174,8 +174,8 @@ void main() {
   });
 
   test('every case reads back as what was written, whoever decided it', () {
-    final mission = JourneyId.parse(_b)!;
-    final trajectory = JourneyPathId.parse(_c)!;
+    final mission = MissionId.parse(_b)!;
+    final trajectory = TrajectoryId.parse(_c)!;
     for (final by in DecidedBy.values) {
       final decisions = <AdmissionDecision>[
         _admitted(OnTrajectory(trajectory), by),
@@ -286,7 +286,7 @@ void main() {
         event,
         by: DecidedBy.rules,
         reading: readings.whereType<ActorsJoinedAddress>().single,
-        placement: IntoMission(InMission(JourneyId.parse(_b)!)),
+        placement: IntoMission(InMission(MissionId.parse(_b)!)),
       ),
     );
     final join = jsonDecode(utf8.decode(joinBody)) as Map<String, Object?>;

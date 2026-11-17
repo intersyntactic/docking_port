@@ -10,7 +10,7 @@ import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_docking_station/path_start.dart';
 import 'package:is_shapes/is_shapes.dart'
-    show DecidedBy, JourneyId, JourneyPathId;
+    show DecidedBy, MissionId, TrajectoryId;
 import 'package:test/test.dart';
 
 import 'decision_wire_test.dart' show event, readings, rules, said;
@@ -32,8 +32,8 @@ AdmittedTrajectoryEntry<JsonObject> _read(Uint8List entry) =>
 
 void main() {
   test('agrees with decodeDecision on every admitted case', () {
-    final mission = JourneyId.parse(_b)!;
-    final trajectory = JourneyPathId.parse(_c)!;
+    final mission = MissionId.parse(_b)!;
+    final trajectory = TrajectoryId.parse(_c)!;
     EventAdmittedToMission admitted(
       AdmissibleEvent reading,
       AdmittedPlacement placement, {
@@ -69,10 +69,10 @@ void main() {
           final starts = narrow as EntryStartsTrajectory<JsonObject>;
           expect(starts.event, full.event);
           expect(starts.by, full.by);
-          expect(starts.trajectory, JourneyPathId.of(entry));
+          expect(starts.trajectory, TrajectoryId.of(entry));
           expect(starts.mission, switch (placement) {
             InMission(:final mission) => mission,
-            StartsMission() => JourneyId.of(entry),
+            StartsMission() => MissionId.of(entry),
           });
           expect(starts.rules.asUncheckedMap(), full.rules!.asUncheckedMap());
         case _:

@@ -8,7 +8,7 @@ import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
 import 'package:is_logbook/is_logbook.dart' show EntryHash;
-import 'package:is_shapes/is_shapes.dart' show JourneyId, JourneyPathId;
+import 'package:is_shapes/is_shapes.dart' show MissionId, TrajectoryId;
 
 import 'decision.dart';
 import 'reading.dart';
@@ -29,12 +29,12 @@ final class DecidedSoFar {
   final _taken = <EntryHash>{};
   final _decidedEvents = <EntryHash>{};
   final _events = <(AddressInExternalSystem, EventKey), EntryHash>{};
-  final _trajectories = <AddressInExternalSystem, JourneyPathId>{};
-  final _trajectoryMissions = <JourneyPathId, JourneyId>{};
-  final _missions = <AddressInExternalSystem, JourneyId>{};
-  final _rules = <JourneyId, JsonObject>{};
+  final _trajectories = <AddressInExternalSystem, TrajectoryId>{};
+  final _trajectoryMissions = <TrajectoryId, MissionId>{};
+  final _missions = <AddressInExternalSystem, MissionId>{};
+  final _rules = <MissionId, JsonObject>{};
   final _messages =
-      <(AddressInExternalSystem, SourceMessageId), JourneyPathId>{};
+      <(AddressInExternalSystem, SourceMessageId), TrajectoryId>{};
 
   /// The last decision: what the next one names as previous. Null before the
   /// first.
@@ -52,23 +52,22 @@ final class DecidedSoFar {
 
   /// The trajectory [addressInExternalSystem] is under. Null when it is under
   /// none yet.
-  JourneyPathId? trajectoryOf(
-    AddressInExternalSystem addressInExternalSystem,
-  ) => _trajectories[addressInExternalSystem];
+  TrajectoryId? trajectoryOf(AddressInExternalSystem addressInExternalSystem) =>
+      _trajectories[addressInExternalSystem];
 
   /// The mission [outside] is: an address others sit within, such as a
   /// channel, or one that sits within nothing, such as a chat. Null before
   /// it starts.
-  JourneyId? missionOf(AddressInExternalSystem outside) => _missions[outside];
+  MissionId? missionOf(AddressInExternalSystem outside) => _missions[outside];
 
   /// The rules [mission] was admitted under. Only for a mission that
   /// [missionOf] has given, since every entry that starts one records them.
-  JsonObject rulesOf(JourneyId mission) => _rules[mission]!;
+  JsonObject rulesOf(MissionId mission) => _rules[mission]!;
 
   /// The trajectory the message [message] in [addressInExternalSystem] was
   /// admitted under: where a change to it goes. Null when it was never
   /// admitted.
-  JourneyPathId? trajectoryOfMessage(
+  TrajectoryId? trajectoryOfMessage(
     AddressInExternalSystem addressInExternalSystem,
     SourceMessageId message,
   ) => _messages[(addressInExternalSystem, message)];
@@ -105,7 +104,7 @@ final class DecidedSoFar {
   /// the messages admitted under them. An address in it then starts a
   /// new trajectory, in the same mission, and a change to a message admitted
   /// before the end is a change to one never admitted.
-  void _end(JourneyId mission) {
+  void _end(MissionId mission) {
     final ended = {
       for (final MapEntry(key: trajectory, value: of)
           in _trajectoryMissions.entries)
@@ -124,17 +123,17 @@ final class DecidedSoFar {
     _events[(addressInExternalSystem, key)] = admitted.event;
     final outside = admitted.containingAddress ?? addressInExternalSystem;
 
-    JourneyId mission(MissionPlacement placement) => switch (placement) {
+    MissionId mission(MissionPlacement placement) => switch (placement) {
       InMission(:final mission) => mission,
       StartsMission() => _start(entry, outside, admitted.rules!),
     };
 
-    final JourneyPathId? on;
+    final TrajectoryId? on;
     switch (admitted.placement) {
       case OnTrajectory(:final trajectory):
         on = trajectory;
       case StartsTrajectory(mission: final placement):
-        final started = on = JourneyPathId.parse(entry.hex)!;
+        final started = on = TrajectoryId.parse(entry.hex)!;
         _trajectories[addressInExternalSystem] = started;
         _trajectoryMissions[started] = mission(placement);
       case IntoMission(mission: final placement):
@@ -147,12 +146,12 @@ final class DecidedSoFar {
   }
 
   /// Starts the mission [outside] is, named by [entry], under [rules].
-  JourneyId _start(
+  MissionId _start(
     EntryHash entry,
     AddressInExternalSystem outside,
     JsonObject rules,
   ) {
-    final mission = _missions[outside] = JourneyId.parse(entry.hex)!;
+    final mission = _missions[outside] = MissionId.parse(entry.hex)!;
     _rules[mission] = rules;
     return mission;
   }
