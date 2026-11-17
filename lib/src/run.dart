@@ -30,6 +30,18 @@ import 'rules.dart';
 /// event, not an arrival").
 final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 
+/// Why [runDockingStation] stopped, when starting it again would stop it the
+/// same way: the record holds, or refuses, something no restart changes,
+/// such as a second start entry or a decision it can't read.
+final class RecordNoRestartChanges implements Exception {
+  const RecordNoRestartChanges(this.why);
+
+  final String why;
+
+  @override
+  String toString() => 'RecordNoRestartChanges: $why';
+}
+
 /// Runs the docking station until [subscribe]'s stream ends, which it never
 /// should: the caller treats a return as the record going away.
 ///
@@ -55,12 +67,13 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 ///
 /// When the record answers [NotTip], the decisions' chain has moved on:
 /// another docking station decided first, and its decision comes on the
-/// record to be taken like any other. Any other answer but [Written] stops
-/// it with a [StateError]: a refusal for some other reason, such as a sender
-/// table that doesn't allow the kind, or no answer, after which the decision
-/// may or may not be in. Deciding on regardless could admit an event twice;
-/// started again, it reads back whatever got in. A decision in the record
-/// that can't be read back stops it too, for the same reason.
+/// record to be taken like any other. A failed add, or no answer, stops it
+/// with a [StateError]: the decision may or may not be in, and deciding on
+/// regardless could admit an event twice; started again, it reads back
+/// whatever got in. A refusal for some other reason, such as a sender table
+/// that doesn't allow the kind, stops it with a [RecordNoRestartChanges], as
+/// do a second start entry, a decision before the first, and an entry it
+/// can't read: starting again would meet each the same way.
 Future<void> runDockingStation({
   required Stream<Subscribed> Function(Set<Kind> kinds) subscribe,
   required Future<WriteResult> Function(
@@ -117,7 +130,7 @@ Future<void> runDockingStation({
       final entry = switch (await send(kind, body, previous: previous)) {
         Written(:final entry) => entry,
         NotTip() => null,
-        WriteRefused(:final why) => throw StateError(
+        WriteRefused(:final why) => throw RecordNoRestartChanges(
           'the decision on ${event.hex} was refused: $why',
         ),
         WriteFailed(:final why) || Unanswered(:final why) => throw StateError(
@@ -136,7 +149,7 @@ Future<void> runDockingStation({
     switch (item) {
       case Entry(:final hash, kind: null):
         // A subscription only sends entries of the kinds asked for.
-        throw StateError('the entry ${hash.hex} has no kind');
+        throw RecordNoRestartChanges('the entry ${hash.hex} has no kind');
       case Entry(:final hash, :final kind) when _eventKinds.contains(kind):
         // Read whether or not it is decided, so a reading learns from the
         // events before the start entry too.
@@ -148,18 +161,22 @@ Future<void> runDockingStation({
         if (start != null) waiting[hash] = reading;
       case Entry(:final hash, :final kind) when kind == startKind:
         if (start != null) {
-          throw StateError(
+          throw RecordNoRestartChanges(
             'a second start entry ${hash.hex}, after ${start.hex}',
           );
         }
         start = hash;
       case Entry(:final hash, kind: final kind?):
         if (start == null) {
-          throw StateError('the decision ${hash.hex} is before any start');
+          throw RecordNoRestartChanges(
+            'the decision ${hash.hex} is before any start',
+          );
         }
         final decision =
             decodeDecision(kind, item.body) ??
-            (throw StateError('cannot read the decision ${hash.hex}'));
+            (throw RecordNoRestartChanges(
+              'cannot read the decision ${hash.hex}',
+            ));
         decided.take(hash, decision);
         waiting.remove(decision.event);
       case CaughtUp():

@@ -317,13 +317,19 @@ void main() {
     expect(record.decisions.last, isA<SaidStartsNoTurn>());
   });
 
-  for (final (what, answer) in [
+  for (final (what, answer, stops) in [
     (
       'a refusal',
       const WriteRefused('kind-not-allowed event-admitted-to-mission'),
+      isA<RecordNoRestartChanges>(),
     ),
-    ('a failed add', const WriteFailed('disk full')),
-    ('no answer', const Unanswered('closed before answering')),
+    // The decision may be in: started again, it reads back whatever got in.
+    ('a failed add', const WriteFailed('disk full'), isA<StateError>()),
+    (
+      'no answer',
+      const Unanswered('closed before answering'),
+      isA<StateError>(),
+    ),
   ]) {
     test('$what, rather than not-tip, stops it', () async {
       final record = _Record();
@@ -332,7 +338,7 @@ void main() {
       record.recordEvent({'said': 'again', 'key': 'a'});
       record.answer = answer;
 
-      await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+      await expectLater(_run(record, _Reading()), throwsA(stops));
       expect(record.decisions, hasLength(1));
       await record.close();
     });
@@ -346,7 +352,10 @@ void main() {
       utf8.encode('{"not": "a decision"}'),
     );
 
-    await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+    await expectLater(
+      _run(record, _Reading()),
+      throwsA(isA<RecordNoRestartChanges>()),
+    );
     await record.close();
   });
 
@@ -433,7 +442,10 @@ void main() {
     final record = _Record();
     record.start();
 
-    await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+    await expectLater(
+      _run(record, _Reading()),
+      throwsA(isA<RecordNoRestartChanges>()),
+    );
     await record.close();
   });
 
@@ -443,7 +455,10 @@ void main() {
     record.decideElsewhere(_startsChat(a.hash, 'a'));
     record.start();
 
-    await expectLater(_run(record, _Reading()), throwsA(isA<StateError>()));
+    await expectLater(
+      _run(record, _Reading()),
+      throwsA(isA<RecordNoRestartChanges>()),
+    );
     await record.close();
   });
 

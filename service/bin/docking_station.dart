@@ -16,7 +16,11 @@
 ///
 /// It exits non-zero whenever the docking station stops, whether it returns
 /// or throws: it should run for as long as the record does, so the service
-/// manager starts it again, and it reads back whatever got in.
+/// manager starts it again, and it reads back whatever got in. Except for
+/// what a restart can't change: 64 for bad arguments, 78 for a config or
+/// rules file it can't read, 65 for a record it can't go on from (a second
+/// start entry, a decision before the first or one it can't read, a refused
+/// decision).
 library;
 
 import 'dart:io';
@@ -72,17 +76,22 @@ Future<void> main(List<String> arguments) async {
     'docking station: ${addressesLetIn.addresses.length} addresses let in, '
     'start entry of kind $startKind',
   );
-  // What it throws is left uncaught: the program exits 255 with it printed,
-  // a [StateError] for a decision refused or unanswered, a [ReadFailure]
-  // for the read socket gone.
-  await runDockingStation(
-    subscribe: (kinds) => reader.subscribe(kinds: kinds),
-    send: writer.write,
-    startKind: startKind,
-    readings: const [TeamsReading()],
-    missions: addressesLetIn,
-    turns: const EverySaidStartsATurn(),
-  );
+  // A record no restart changes exits 65, which the service manager doesn't
+  // restart. Anything else is left uncaught, so the program exits 255 with
+  // it printed and is started again: a [StateError] for a decision that may
+  // or may not be in, a [ReadFailure] for the read socket gone.
+  try {
+    await runDockingStation(
+      subscribe: (kinds) => reader.subscribe(kinds: kinds),
+      send: writer.write,
+      startKind: startKind,
+      readings: const [TeamsReading()],
+      missions: addressesLetIn,
+      turns: const EverySaidStartsATurn(),
+    );
+  } on RecordNoRestartChanges catch (e) {
+    _abort(e.why, 65);
+  }
   _abort('stopped: the record\'s subscription ended', 1);
 }
 
