@@ -1,0 +1,33 @@
+name: docking_station_service
+description: >-
+  The docking station run as a service: it reads the record through the
+  journal's read socket and sends each decision through its write socket.
+version: 0.0.1
+repository: https://github.com/intersyntactic/docking_station
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  checked_json: ^0.2.1
+  is_docking_station:
+    path: ..
+  is_journal_client: ^0.1.0
+  is_teams_module:
+    git:
+      url: https://github.com/intersyntactic/teams_module.git
+      ref: main
+
+# is_teams_module pins is_docking_station to a commit of its own; pub won't
+# mix a git source and a path source for one package, so the library beside
+# this package wins.
+dependency_overrides:
+  is_docking_station:
+    path: ..
+
+dev_dependencies:
+  is_conversation_shapes: ^0.8.0
+  is_shapes: ^0.4.3
+  lints: ^6.1.0
+  test: ^1.33.0
