@@ -144,7 +144,7 @@ sealed class AdmissibleEvent extends EventReading {
   final EventKey key;
 }
 
-/// Something said, as [node], the node the trajectory's apex appends.
+/// Something said, as [node], the node the trajectory's crux appends.
 /// Whether it starts a turn is the docking station's decision, under the
 /// trajectory's rules.
 ///
@@ -239,7 +239,7 @@ final class ActorsJoinedAddress extends AdmissibleEvent {
 /// named `Judged`, then `ShownMessageJudged`, 16 Nov). Named for what the
 /// person said, not for the button, so a Slack button reads the same.
 ///
-/// It names the message, never a turn: the trajectory's apex builds the
+/// It names the message, never a turn: the trajectory's crux builds the
 /// annotation, a `NodeApproval`, a `NodeSeenMark` or a `NodeCorrection`,
 /// once it knows which turn [to] showed. A verdict always names who gave
 /// it, since a verdict from no one approves nothing.

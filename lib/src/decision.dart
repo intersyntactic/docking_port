@@ -143,7 +143,7 @@ sealed class AdmissionDecision {
 ///
 /// `<reading>` is the whole reading, as [encodeReading] writes it (Nick,
 /// 16 Nov: the entry that admits it carries the reading), so whatever hands
-/// the event to its trajectory's apex reads the node from the decision, and
+/// the event to its trajectory's crux reads the node from the decision, and
 /// never reads a module's bytes. The placement is `"trajectory": <id>` for
 /// [OnTrajectory]; `"startsTrajectory": true` and the mission for
 /// [StartsTrajectory]; the mission alone for [IntoMission]. The mission is

@@ -13,7 +13,7 @@
 /// decisions add up to when read back; and [runDockingStation], which
 /// subscribes to the record and sends each decision to it.
 ///
-/// Not here yet: handing an event to a trajectory's apex.
+/// Not here yet: handing an event to a trajectory's crux.
 library;
 
 export 'src/decide.dart';
