@@ -8,6 +8,9 @@
 ///     --write-socket=/run/.../write.sock   the journal's write socket
 ///     --config=/etc/.../config.json        the addresses let in, as
 ///                                          [AddressesLetIn] reads them
+///     --what-may-leave-this-machine=/etc/.../hart.json
+///                                          the bot's rules file, read as
+///                                          [WhatMayLeaveThisMachine]
 ///     --start-kind=KIND                    the kind of the start entry,
 ///                                          written once at setup
 ///
@@ -23,7 +26,13 @@ import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_journal_client/is_journal_client.dart';
 import 'package:is_teams_module/is_teams_module.dart' show TeamsReading;
 
-const _options = {'read-socket', 'write-socket', 'config', 'start-kind'};
+const _options = {
+  'read-socket',
+  'write-socket',
+  'config',
+  'what-may-leave-this-machine',
+  'start-kind',
+};
 
 Future<void> main(List<String> arguments) async {
   final given = <String, String>{};
@@ -43,16 +52,19 @@ Future<void> main(List<String> arguments) async {
   final startKind =
       Kind.parse(given['start-kind']!) ??
       _abort('--start-kind "${given['start-kind']}" is not a kind', 64);
-  final AddressesLetIn addressesLetIn;
-  try {
-    addressesLetIn = AddressesLetIn.parse(
-      await File(given['config']!).readAsString(),
-    );
-  } on FileSystemException catch (e) {
-    _abort('the config could not be read: ${e.message}', 78);
-  } on FormatException catch (e) {
-    _abort('the config is not one this reads: ${e.message}', 78);
-  }
+  final whatMayLeaveThisMachine = await _read(
+    given['what-may-leave-this-machine']!,
+    'the rules file',
+    readWhatMayLeaveThisMachine,
+  );
+  final addressesLetIn = await _read(
+    given['config']!,
+    'the config',
+    (text) => AddressesLetIn.parse(
+      text,
+      whatMayLeaveThisMachine: whatMayLeaveThisMachine,
+    ),
+  );
 
   final reader = JournalReader(given['read-socket']!);
   final writer = JournalWriter(given['write-socket']!);
@@ -68,10 +80,25 @@ Future<void> main(List<String> arguments) async {
     send: writer.write,
     startKind: startKind,
     readings: const [TeamsReading()],
-    journeys: addressesLetIn,
+    missions: addressesLetIn,
     turns: const EverySaidStartsATurn(),
   );
   _abort('stopped: the record\'s subscription ended', 1);
+}
+
+/// [path]'s contents as [read] reads them, or exit 78 naming [what].
+Future<T> _read<T>(String path, String what, T Function(String) read) async {
+  final String text;
+  try {
+    text = await File(path).readAsString();
+  } on FileSystemException catch (e) {
+    _abort('$what could not be read: ${e.message}', 78);
+  }
+  try {
+    return read(text);
+  } on FormatException catch (e) {
+    _abort('$what is not one this reads: ${e.message}', 78);
+  }
 }
 
 Never _abort(String why, int code) {

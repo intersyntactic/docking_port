@@ -13,18 +13,29 @@ dependencies:
   checked_json: ^0.2.1
   is_docking_station:
     path: ..
-  is_journal_client: ^0.1.0
+  is_flight_rules:
+    git:
+      url: https://github.com/intersyntactic/flight_rules.git
+      ref: 0664435a
+  is_journal_client: ^0.1.2
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
       ref: main
 
-# is_teams_module pins is_docking_station to a commit of its own; pub won't
-# mix a git source and a path source for one package, so the library beside
-# this package wins.
 dependency_overrides:
+  # is_teams_module pins is_docking_station to a commit of its own; pub won't
+  # mix a git source and a path source for one package, so the library beside
+  # this package wins.
   is_docking_station:
     path: ..
+  # is_flight_rules needs is_effects 0.7.0 (ModelSignInName), not on pub.dev
+  # yet; this is its 0.7.0, from effects' open PR 4. Drop it once 0.7.0 is
+  # published. It binds here only because this package is the one built.
+  is_effects:
+    git:
+      url: https://github.com/intersyntactic/effects.git
+      ref: b313ac87
 
 dev_dependencies:
   is_conversation_shapes: ^0.8.0
