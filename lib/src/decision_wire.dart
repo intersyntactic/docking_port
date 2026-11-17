@@ -24,28 +24,31 @@ import 'reading_wire.dart';
     'by': decision.by.name,
   };
   switch (decision) {
-    case EventAdmitted():
+    case EventAdmittedToMission():
       json['reading'] = encodeReading(decision.reading);
       switch (decision.placement) {
-        case UnderJourneyPath(:final journeyPath):
-          json['journeyPath'] = journeyPath.hex;
-        case StartsJourneyPath(:final journey):
-          json['startsJourneyPath'] = true;
-          _journey(json, journey);
-        case IntoJourney(:final journey):
-          _journey(json, journey);
+        case OnTrajectory(:final trajectory):
+          json['trajectory'] = trajectory.hex;
+        case StartsTrajectory(:final mission):
+          json['startsTrajectory'] = true;
+          _mission(json, mission);
+        case IntoMission(:final mission):
+          _mission(json, mission);
       }
       if (decision.rules case final rules?) json['rules'] = rules;
       if (decision.startsTurn case final startsTurn?) {
         json['startsTurn'] = startsTurn;
       }
-    case JourneyEnded(:final journey):
-      json['journey'] = journey.hex;
-    case EventDeclined():
+    case MissionEnded(:final mission):
+      json['mission'] = mission.hex;
+    case EventNotAdmittedToMission():
       json['why'] = _why(decision);
-      if (decision case DeclinedKeyedEvent(:final conversation, :final key)) {
+      if (decision case NotAdmittedKeyedEvent(
+        :final addressInExternalSystem,
+        :final key,
+      )) {
         json
-          ..['conversation'] = conversation.value
+          ..['addressInExternalSystem'] = addressInExternalSystem.value
           ..['key'] = key.value;
       }
       switch (decision) {
@@ -58,29 +61,29 @@ import 'reading_wire.dart';
       }
   }
   final kind = switch (decision) {
-    EventAdmitted() => DecisionEntryKind.admitted,
-    EventDeclined() => DecisionEntryKind.declined,
-    JourneyEnded() => DecisionEntryKind.ended,
+    EventAdmittedToMission() => DecisionEntryKind.eventAdmittedToMission,
+    EventNotAdmittedToMission() => DecisionEntryKind.eventNotAdmittedToMission,
+    MissionEnded() => DecisionEntryKind.missionEnded,
   };
   return (kind, Uint8List.fromList(utf8.encode(jsonEncode(json))));
 }
 
-void _journey(Map<String, Object?> json, JourneyPlacement journey) {
-  switch (journey) {
-    case InJourney(:final journey):
-      json['journey'] = journey.hex;
-    case StartsJourney():
-      json['startsJourney'] = true;
+void _mission(Map<String, Object?> json, MissionPlacement mission) {
+  switch (mission) {
+    case InMission(:final mission):
+      json['mission'] = mission.hex;
+    case StartsMission():
+      json['startsMission'] = true;
   }
 }
 
-String _why(EventDeclined declined) => switch (declined) {
+String _why(EventNotAdmittedToMission declined) => switch (declined) {
   NoReadingForSource() => 'no-reading-for-source',
   ReadingFoundNothing() => 'reading-found-nothing',
   DuplicateEvent() => 'duplicate-event',
-  ConversationNotTakenIn() => 'conversation-not-taken-in',
+  AddressNotAdmittedToMission() => 'address-not-admitted-to-mission',
   SaidStartsNoTurn() => 'said-starts-no-turn',
-  ShownMessageJudgedUnplaced() => 'shown-message-judged-unplaced',
+  JudgedMessageHasNoTrajectory() => 'judged-message-has-no-trajectory',
   ChangeToUnadmittedMessage() => 'change-to-unadmitted-message',
 };
 
@@ -98,12 +101,16 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
   final event = _read(json['event'], EntryHash.parse);
   final by = _read(json['by'], _decidedBy);
   if (event == null || by == null) return null;
-  if (kind == DecisionEntryKind.admitted) return _admitted(event, by, json);
-  if (kind == DecisionEntryKind.declined) return _declined(event, by, json);
-  if (kind == DecisionEntryKind.ended) {
-    final journey = _read(json['journey'], JourneyId.parse);
-    if (journey == null || json.length != 3) return null;
-    return JourneyEnded(event, by: by, journey: journey);
+  if (kind == DecisionEntryKind.eventAdmittedToMission) {
+    return _admitted(event, by, json);
+  }
+  if (kind == DecisionEntryKind.eventNotAdmittedToMission) {
+    return _notAdmitted(event, by, json);
+  }
+  if (kind == DecisionEntryKind.missionEnded) {
+    final mission = _read(json['mission'], JourneyId.parse);
+    if (mission == null || json.length != 3) return null;
+    return MissionEnded(event, by: by, mission: mission);
   }
   return null;
 }
@@ -111,7 +118,7 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
 /// The [DecidedBy] named [name]; null for any other name.
 DecidedBy? _decidedBy(String name) => DecidedBy.values.asNameMap()[name];
 
-EventAdmitted? _admitted(
+EventAdmittedToMission? _admitted(
   EntryHash event,
   DecidedBy by,
   Map<String, Object?> json,
@@ -128,20 +135,20 @@ EventAdmitted? _admitted(
   final fields = {'event', 'by', 'reading'};
 
   final AdmittedPlacement placement;
-  if (json.containsKey('journeyPath')) {
-    final path = _read(json['journeyPath'], JourneyPathId.parse);
-    if (path == null) return null;
-    fields.add('journeyPath');
-    placement = UnderJourneyPath(path);
+  if (json.containsKey('trajectory')) {
+    final trajectory = _read(json['trajectory'], JourneyPathId.parse);
+    if (trajectory == null) return null;
+    fields.add('trajectory');
+    placement = OnTrajectory(trajectory);
   } else {
-    final journey = _readJourney(json, fields);
-    if (journey == null) return null;
-    if (json.containsKey('startsJourneyPath')) {
-      if (json['startsJourneyPath'] != true) return null;
-      fields.add('startsJourneyPath');
-      placement = StartsJourneyPath(journey);
+    final mission = _readMission(json, fields);
+    if (mission == null) return null;
+    if (json.containsKey('startsTrajectory')) {
+      if (json['startsTrajectory'] != true) return null;
+      fields.add('startsTrajectory');
+      placement = StartsTrajectory(mission);
     } else {
-      placement = IntoJourney(journey);
+      placement = IntoMission(mission);
     }
   }
   JsonObject? rules;
@@ -160,10 +167,10 @@ EventAdmitted? _admitted(
     fields.add('startsTurn');
   }
   if (json.length != fields.length) return null;
-  if ((rules != null) != EventAdmitted.starts(placement)) return null;
+  if ((rules != null) != EventAdmittedToMission.starts(placement)) return null;
   if ((startsTurn != null) != (reading is MessageSaid)) return null;
-  if (placement is StartsJourneyPath && startsTurn == false) return null;
-  return EventAdmitted(
+  if (placement is StartsTrajectory && startsTurn == false) return null;
+  return EventAdmittedToMission(
     event,
     by: by,
     reading: reading,
@@ -173,22 +180,22 @@ EventAdmitted? _admitted(
   );
 }
 
-JourneyPlacement? _readJourney(Map<String, Object?> json, Set<String> fields) {
-  final inJourney = json.containsKey('journey');
-  final starts = json.containsKey('startsJourney');
-  if (inJourney == starts) return null;
-  if (inJourney) {
-    final journey = _read(json['journey'], JourneyId.parse);
-    if (journey == null) return null;
-    fields.add('journey');
-    return InJourney(journey);
+MissionPlacement? _readMission(Map<String, Object?> json, Set<String> fields) {
+  final inMission = json.containsKey('mission');
+  final starts = json.containsKey('startsMission');
+  if (inMission == starts) return null;
+  if (inMission) {
+    final mission = _read(json['mission'], JourneyId.parse);
+    if (mission == null) return null;
+    fields.add('mission');
+    return InMission(mission);
   }
-  if (json['startsJourney'] != true) return null;
-  fields.add('startsJourney');
-  return const StartsJourney();
+  if (json['startsMission'] != true) return null;
+  fields.add('startsMission');
+  return const StartsMission();
 }
 
-EventDeclined? _declined(
+EventNotAdmittedToMission? _notAdmitted(
   EntryHash event,
   DecidedBy by,
   Map<String, Object?> json,
@@ -201,9 +208,12 @@ EventDeclined? _declined(
         ? NoReadingForSource(event, by: by)
         : ReadingFoundNothing(event, by: by);
   }
-  final conversation = _read(json['conversation'], ConversationId.parse);
+  final addressInExternalSystem = _read(
+    json['addressInExternalSystem'],
+    AddressInExternalSystem.parse,
+  );
   final key = _read(json['key'], EventKey.parse);
-  if (conversation == null || key == null) return null;
+  if (addressInExternalSystem == null || key == null) return null;
   switch (why) {
     case 'duplicate-event':
       final of = _read(json['of'], EntryHash.parse);
@@ -211,7 +221,7 @@ EventDeclined? _declined(
       return DuplicateEvent(
         event,
         by: by,
-        conversation: conversation,
+        addressInExternalSystem: addressInExternalSystem,
         key: key,
         of: of,
       );
@@ -221,31 +231,31 @@ EventDeclined? _declined(
       return ChangeToUnadmittedMessage(
         event,
         by: by,
-        conversation: conversation,
+        addressInExternalSystem: addressInExternalSystem,
         key: key,
         message: message,
       );
-    case 'conversation-not-taken-in' ||
+    case 'address-not-admitted-to-mission' ||
         'said-starts-no-turn' ||
-        'shown-message-judged-unplaced':
+        'judged-message-has-no-trajectory':
       if (json.length != 5) return null;
       return switch (why) {
-        'conversation-not-taken-in' => ConversationNotTakenIn(
+        'address-not-admitted-to-mission' => AddressNotAdmittedToMission(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         ),
         'said-starts-no-turn' => SaidStartsNoTurn(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         ),
-        _ => ShownMessageJudgedUnplaced(
+        _ => JudgedMessageHasNoTrajectory(
           event,
           by: by,
-          conversation: conversation,
+          addressInExternalSystem: addressInExternalSystem,
           key: key,
         ),
       };

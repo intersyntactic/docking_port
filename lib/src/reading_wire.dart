@@ -1,5 +1,5 @@
-/// A reading as the `admitted` entry carries it, and back, read strictly,
-/// since it is our own wire.
+/// A reading as the `event-admitted-to-mission` entry carries it, and back,
+/// read strictly, since it is our own wire.
 ///
 /// The nodes inside travel in their own packages' map form,
 /// `{"shape": <class name>, ...its fields}`, each under a field of its own,
@@ -28,18 +28,18 @@ const readingNodeShapes = <String, Set<String>>{
 
 /// [reading] as JSON:
 ///
-///     {"case": <case>, "conversation": <id>, "within": <id>?,
-///      "key": <key>, ...the case's own fields}
+///     {"case": <case>, "addressInExternalSystem": <id>,
+///      "containingAddress": <id>?, "key": <key>, ...the case's own fields}
 ///
 /// `<case>` and its fields are `message-said`, with `"node"`, a
 /// [UserSaid]; `message-changed`, with `"from"?`, `"message"` and
-/// `"change"`, a [WhatChanged]; `conversation-joined`, with `"from"?` and
+/// `"change"`, a [WhatChanged]; `actors-joined-address`, with `"from"?` and
 /// `"joiners"`; `shown-message-judged`, with `"from"`, `"to"` and
 /// `"verdict"`, a [VerdictOnShownMessage].
 JsonObject encodeReading(AdmissibleEvent reading) => JsonObject.of({
   'case': _case(reading),
-  'conversation': reading.conversation.value,
-  'within': ?reading.within?.value,
+  'addressInExternalSystem': reading.addressInExternalSystem.value,
+  'containingAddress': ?reading.containingAddress?.value,
   'key': reading.key.value,
   ...switch (reading) {
     MessageSaid(:final node) => {'node': node.toJson()},
@@ -48,7 +48,7 @@ JsonObject encodeReading(AdmissibleEvent reading) => JsonObject.of({
       'message': message.value,
       'change': change.toJson(),
     },
-    ConversationJoined(:final from, :final joiners) => {
+    ActorsJoinedAddress(:final from, :final joiners) => {
       'from': ?from?.value,
       'joiners': [for (final joiner in joiners) joiner.value],
     },
@@ -63,7 +63,7 @@ JsonObject encodeReading(AdmissibleEvent reading) => JsonObject.of({
 String _case(AdmissibleEvent reading) => switch (reading) {
   MessageSaid() => 'message-said',
   MessageChanged() => 'message-changed',
-  ConversationJoined() => 'conversation-joined',
+  ActorsJoinedAddress() => 'actors-joined-address',
   ShownMessageJudged() => 'shown-message-judged',
 };
 
@@ -71,9 +71,13 @@ String _case(AdmissibleEvent reading) => switch (reading) {
 /// [FormatException] for anything it doesn't write: an unknown case, a
 /// field missing, extra or malformed, a node its package won't read.
 AdmissibleEvent decodeReading(JsonObject json) {
-  final conversation = _parse(json, 'conversation', ConversationId.parse);
-  final within = json.has('within')
-      ? _parse(json, 'within', ConversationId.parse)
+  final addressInExternalSystem = _parse(
+    json,
+    'addressInExternalSystem',
+    AddressInExternalSystem.parse,
+  );
+  final containingAddress = json.has('containingAddress')
+      ? _parse(json, 'containingAddress', AddressInExternalSystem.parse)
       : null;
   final key = _parse(json, 'key', EventKey.parse);
   ActorId? from() =>
@@ -82,8 +86,8 @@ AdmissibleEvent decodeReading(JsonObject json) {
   final (reading, fields) = switch (json.string('case')) {
     'message-said' => (
       MessageSaid(
-        conversation: conversation,
-        within: within,
+        addressInExternalSystem: addressInExternalSystem,
+        containingAddress: containingAddress,
         key: key,
         node: UserSaid.fromJson(json.object('node')),
       ),
@@ -91,8 +95,8 @@ AdmissibleEvent decodeReading(JsonObject json) {
     ),
     'message-changed' => (
       MessageChanged(
-        conversation: conversation,
-        within: within,
+        addressInExternalSystem: addressInExternalSystem,
+        containingAddress: containingAddress,
         from: from(),
         key: key,
         message: _parse(json, 'message', SourceMessageId.parse),
@@ -100,10 +104,10 @@ AdmissibleEvent decodeReading(JsonObject json) {
       ),
       const {'from', 'message', 'change'},
     ),
-    'conversation-joined' => (
-      ConversationJoined.of(
-            conversation: conversation,
-            within: within,
+    'actors-joined-address' => (
+      ActorsJoinedAddress.of(
+            addressInExternalSystem: addressInExternalSystem,
+            containingAddress: containingAddress,
             from: from(),
             key: key,
             joiners: [
@@ -117,8 +121,8 @@ AdmissibleEvent decodeReading(JsonObject json) {
     ),
     'shown-message-judged' => (
       ShownMessageJudged(
-        conversation: conversation,
-        within: within,
+        addressInExternalSystem: addressInExternalSystem,
+        containingAddress: containingAddress,
         from: _parse(json, 'from', ActorId.parse),
         key: key,
         to: _parse(json, 'to', SourceMessageId.parse),
@@ -129,7 +133,13 @@ AdmissibleEvent decodeReading(JsonObject json) {
     final other => throw FormatException('`case` is not a reading: $other'),
   };
   for (final field in json.keys) {
-    if (!{'case', 'conversation', 'within', 'key', ...fields}.contains(field)) {
+    if (!{
+      'case',
+      'addressInExternalSystem',
+      'containingAddress',
+      'key',
+      ...fields,
+    }.contains(field)) {
       throw FormatException('`$field` is not a field of a reading');
     }
   }

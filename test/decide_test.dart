@@ -32,8 +32,8 @@ void main() {
   test('every duplicate names the first event with its key, not the copy '
       'before it', () {
     final said = MessageSaid(
-      conversation: ConversationId.parse('test:chat')!,
-      within: null,
+      addressInExternalSystem: AddressInExternalSystem.parse('test:chat')!,
+      containingAddress: null,
       key: EventKey.parse('message:1')!,
       node: UserSaid(
         author: ActorId.parse('teams:t/p')!,
@@ -49,7 +49,7 @@ void main() {
         event,
         said,
         decided,
-        journeys: _All(),
+        missions: _All(),
         turns: _All(),
       );
       if (decision case DuplicateEvent(:final of)) ofs.add(of);
@@ -60,16 +60,16 @@ void main() {
     expect(ofs, [events[0], events[0], events[0]]);
   });
 
-  test('something said that starts no turn is context under a path already '
+  test('something said that starts no turn is context on a trajectory already '
       'started, and never starts one', () {
-    final chat = ConversationId.parse('test:chat')!;
+    final chat = AddressInExternalSystem.parse('test:chat')!;
     final decided = DecidedSoFar();
     AdmissionDecision step(String key, String text) {
       final decision = decide(
         _hash(key),
         MessageSaid(
-          conversation: chat,
-          within: null,
+          addressInExternalSystem: chat,
+          containingAddress: null,
           key: EventKey.parse(key)!,
           node: UserSaid(
             author: ActorId.parse('teams:t/p')!,
@@ -78,7 +78,7 @@ void main() {
           ),
         ),
         decided,
-        journeys: _All(),
+        missions: _All(),
         turns: _Mentions(),
       );
       decided.take(_hash('decision $key'), decision);
@@ -86,15 +86,15 @@ void main() {
     }
 
     expect(step('a', 'morning all'), isA<SaidStartsNoTurn>());
-    final started = step('b', '@agent hello') as EventAdmitted;
-    expect(started.placement, isA<StartsJourneyPath>());
+    final started = step('b', '@agent hello') as EventAdmittedToMission;
+    expect(started.placement, isA<StartsTrajectory>());
     expect(started.startsTurn, isTrue);
-    final context = step('c', 'lunch?') as EventAdmitted;
+    final context = step('c', 'lunch?') as EventAdmittedToMission;
     expect(
       context.placement,
-      isA<UnderJourneyPath>().having(
-        (p) => p.journeyPath.hex,
-        'journeyPath',
+      isA<OnTrajectory>().having(
+        (p) => p.trajectory.hex,
+        'trajectory',
         _hash('decision b').hex,
       ),
     );
@@ -102,12 +102,14 @@ void main() {
     expect(context.rules, isNull);
   });
 
-  test('a path started in a journey already taken in records the rules '
-      'the journey was taken in under, without asking the rule again', () {
-    final channel = ConversationId.parse('test:channel')!;
+  test('a trajectory started in a mission already admitted records the rules '
+      'the mission was admitted under, without asking the rule again', () {
+    final channel = AddressInExternalSystem.parse('test:channel')!;
     MessageSaid said(String thread, String key) => MessageSaid(
-      conversation: ConversationId.parse('test:channel;$thread')!,
-      within: channel,
+      addressInExternalSystem: AddressInExternalSystem.parse(
+        'test:channel;$thread',
+      )!,
+      containingAddress: channel,
       key: EventKey.parse(key)!,
       node: UserSaid(
         author: ActorId.parse('teams:t/p')!,
@@ -121,7 +123,7 @@ void main() {
       _hash('A'),
       said('t1', 'a'),
       decided,
-      journeys: rule,
+      missions: rule,
       turns: _All(),
     );
     decided.take(_hash('decision A'), first);
@@ -129,20 +131,23 @@ void main() {
       _hash('B'),
       said('t2', 'b'),
       decided,
-      journeys: rule,
+      missions: rule,
       turns: _All(),
     );
     expect(rule.asked, 1);
-    expect((first as EventAdmitted).placement, isA<StartsJourneyPath>());
-    final placement = (second as EventAdmitted).placement;
+    expect(
+      (first as EventAdmittedToMission).placement,
+      isA<StartsTrajectory>(),
+    );
+    final placement = (second as EventAdmittedToMission).placement;
     expect(
       placement,
-      isA<StartsJourneyPath>().having(
-        (p) => p.journey,
-        'journey',
-        isA<InJourney>().having(
-          (j) => j.journey,
-          'journey',
+      isA<StartsTrajectory>().having(
+        (p) => p.mission,
+        'mission',
+        isA<InMission>().having(
+          (j) => j.mission,
+          'mission',
           JourneyId.parse(_hash('decision A').hex),
         ),
       ),
@@ -150,12 +155,14 @@ void main() {
     expect(second.rules?.asUncheckedMap(), {'asked': 1});
   });
 
-  test('after a journey ends, its conversation starts a new path in the '
-      'same journey, under the same rules', () {
-    final channel = ConversationId.parse('test:channel')!;
+  test('after a mission ends, its address starts a new trajectory in the '
+      'same mission, under the same rules', () {
+    final channel = AddressInExternalSystem.parse('test:channel')!;
     MessageSaid said(String key) => MessageSaid(
-      conversation: ConversationId.parse('test:channel;t1')!,
-      within: channel,
+      addressInExternalSystem: AddressInExternalSystem.parse(
+        'test:channel;t1',
+      )!,
+      containingAddress: channel,
       key: EventKey.parse(key)!,
       node: UserSaid(
         author: ActorId.parse('teams:t/p')!,
@@ -170,38 +177,38 @@ void main() {
         _hash(key),
         said(key),
         decided,
-        journeys: rule,
+        missions: rule,
         turns: _All(),
       );
       decided.take(_hash('decision $key'), decision);
       return decision;
     }
 
-    final first = step('a') as EventAdmitted;
-    final journey = JourneyId.parse(_hash('decision a').hex)!;
+    final first = step('a') as EventAdmittedToMission;
+    final mission = JourneyId.parse(_hash('decision a').hex)!;
     expect(
       step('b'),
-      isA<EventAdmitted>().having(
+      isA<EventAdmittedToMission>().having(
         (a) => a.placement,
         'placement',
-        isA<UnderJourneyPath>(),
+        isA<OnTrajectory>(),
       ),
     );
     decided.take(
       _hash('end'),
-      JourneyEnded(
+      MissionEnded(
         _hash('asked to end'),
         by: DecidedBy.person,
-        journey: journey,
+        mission: mission,
       ),
     );
-    final again = step('c') as EventAdmitted;
+    final again = step('c') as EventAdmittedToMission;
     expect(
       again.placement,
-      isA<StartsJourneyPath>().having(
-        (p) => p.journey,
-        'journey',
-        isA<InJourney>().having((j) => j.journey, 'journey', journey),
+      isA<StartsTrajectory>().having(
+        (p) => p.mission,
+        'mission',
+        isA<InMission>().having((j) => j.mission, 'mission', mission),
       ),
     );
     expect(again.rules?.asUncheckedMap(), first.rules?.asUncheckedMap());
@@ -209,7 +216,7 @@ void main() {
   });
 }
 
-/// Takes every journey in, under rules that say how many times it was
+/// Takes every mission in, under rules that say how many times it was
 /// asked.
 final class _Counting implements JourneyRule {
   var asked = 0;

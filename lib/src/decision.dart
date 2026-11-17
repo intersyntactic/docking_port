@@ -1,13 +1,13 @@
 /// What the docking station decides about each event, each sent to the record
 /// as an entry of its own (RULINGS, "The docking station admits events under
-/// journey paths").
+/// trajectories").
 ///
-/// Every event is decided exactly once: [EventAdmitted] under a journey path,
-/// or [EventDeclined], saying why. A decline is recorded as well as an
-/// admission, so on a restart the docking station reads back what it decided
-/// rather than deciding again. An event with no decision is one it had
-/// not reached, never one it turned away, so a reading or a rule changed
-/// since cannot admit an old event it once declined.
+/// Every event is decided exactly once: [EventAdmittedToMission] under a
+/// trajectory, or [EventNotAdmittedToMission], saying why. A decline is
+/// recorded as well as an admission, so on a restart the docking station reads
+/// back what it decided rather than deciding again. An event with no decision
+/// is one it had not reached, never one it turned away, so a reading or a rule
+/// changed since cannot admit an old event it once kept out.
 ///
 /// The decisions are one chain in the record, each naming the one before it
 /// as previous. The record refuses an entry whose previous is not its
@@ -19,7 +19,7 @@
 /// record starts a new chain for any entry with no previous, so two docking
 /// stations making a first decision with none would start two.
 ///
-/// Each decision holds what it was decided on (the conversation, the
+/// Each decision holds what it was decided on (the address, the
 /// event's key, the message), so the docking station's state is rebuilt from
 /// its decisions alone, whatever a module's reading would make of an old
 /// event now.
@@ -39,73 +39,83 @@ import 'rules.dart';
 /// The kinds of entry the docking station sends, one per event. Its user's
 /// row in the record's sender table allows these three and nothing else.
 abstract final class DecisionEntryKind {
-  /// An [EventAdmitted]'s kind.
-  static final admitted = Kind.parse('admitted')!;
+  /// An [EventAdmittedToMission]'s kind.
+  static final eventAdmittedToMission = Kind.parse(
+    'event-admitted-to-mission',
+  )!;
 
-  /// A [EventDeclined]'s kind.
-  static final declined = Kind.parse('declined')!;
+  /// A [EventNotAdmittedToMission]'s kind.
+  static final eventNotAdmittedToMission = Kind.parse(
+    'event-not-admitted-to-mission',
+  )!;
 
-  /// An [JourneyEnded]'s kind.
-  static final ended = Kind.parse('ended')!;
+  /// A [MissionEnded]'s kind, the journal's own word: it reads it to close
+  /// the mission's chains.
+  // TODO(0.10.0): Kind.missionEnded
+  static final missionEnded = Kind.parse('mission-ended')!;
 
   /// Every kind above, as the docking station subscribes to its own
   /// decisions.
-  static final all = {admitted, declined, ended};
+  static final all = {
+    eventAdmittedToMission,
+    eventNotAdmittedToMission,
+    missionEnded,
+  };
 }
 
 /// Where an admitted event goes. Something said, or a change, goes
-/// [UnderJourneyPath] a journey path already started, or
-/// [StartsJourneyPath], a new one its admission starts. A join goes
-/// [IntoJourney]: it says who is in a journey, and is under none of its
-/// journey paths.
+/// [OnTrajectory] a trajectory already started, or
+/// [StartsTrajectory], a new one its admission starts. A join goes
+/// [IntoMission]: it says who is in a mission, and is under none of its
+/// trajectories.
 sealed class AdmittedPlacement {
   const AdmittedPlacement();
 }
 
-/// Under [journeyPath], in the journey it was started in.
-final class UnderJourneyPath extends AdmittedPlacement {
-  const UnderJourneyPath(this.journeyPath);
+/// Under [trajectory], in the mission it was started in.
+final class OnTrajectory extends AdmittedPlacement {
+  const OnTrajectory(this.trajectory);
 
-  final JourneyPathId journeyPath;
+  final JourneyPathId trajectory;
 }
 
-/// Under a new journey path in [journey], which the admission starts and
-/// is named by: its id is the hash of the `admitted` entry that started
-/// it. A [JourneyPathId] is given by whoever starts the journey path, and
-/// here that is the docking station, so the entry that started it is its one
-/// name, the way a turn's id is the hash of its entry.
-final class StartsJourneyPath extends AdmittedPlacement {
-  const StartsJourneyPath(this.journey);
+/// Under a new trajectory in [mission], which the admission starts and is named
+/// by: its id is the hash of the `event-admitted-to-mission` entry that started
+/// it. A [JourneyPathId] is given by whoever starts the trajectory, and here
+/// that is the docking station, so the entry that started it is its one name,
+/// the way a turn's id is the hash of its entry.
+final class StartsTrajectory extends AdmittedPlacement {
+  const StartsTrajectory(this.mission);
 
-  final JourneyPlacement journey;
+  final MissionPlacement mission;
 }
 
-/// Into [journey]: a join, which is about who is in it.
-final class IntoJourney extends AdmittedPlacement {
-  const IntoJourney(this.journey);
+/// Into [mission]: a join, which is about who is in it.
+final class IntoMission extends AdmittedPlacement {
+  const IntoMission(this.mission);
 
-  final JourneyPlacement journey;
+  final MissionPlacement mission;
 }
 
-/// Which journey: [InJourney], one already started, or [StartsJourney], a
-/// new one the admission starts. A journey the docking station starts is
-/// named like a journey path it starts, by the `admitted` entry's hash, as
-/// a [JourneyId]. One entry can start both, as a chat's first message
-/// does, and then both have its hash, as two kinds of name.
-sealed class JourneyPlacement {
-  const JourneyPlacement();
+/// Which mission: [InMission], one already started, or [StartsMission], a new
+/// one the admission starts. A mission the docking station starts is named like
+/// a trajectory it starts, by the `event-admitted-to-mission` entry's hash, as
+/// a [JourneyId]. One entry can start both, as a chat's first message does, and
+/// then both have its hash, as two kinds of name.
+sealed class MissionPlacement {
+  const MissionPlacement();
 }
 
-/// In [journey], already started.
-final class InJourney extends JourneyPlacement {
-  const InJourney(this.journey);
+/// In [mission], already started.
+final class InMission extends MissionPlacement {
+  const InMission(this.mission);
 
-  final JourneyId journey;
+  final JourneyId mission;
 }
 
-/// In a new journey, which the admission starts.
-final class StartsJourney extends JourneyPlacement {
-  const StartsJourney();
+/// In a new mission, which the admission starts.
+final class StartsMission extends MissionPlacement {
+  const StartsMission();
 }
 
 /// What the docking station decided about the event recorded at [event], and
@@ -126,44 +136,44 @@ sealed class AdmissionDecision {
 
 /// [event], read as [reading], admitted by [placement].
 ///
-/// The entry, of kind `admitted`:
+/// The entry, of kind `event-admitted-to-mission`:
 ///
 ///     {"event": <hex>, "by": <who>, "reading": <reading>,
 ///      ...the placement, "rules": <rules>?, "startsTurn": <bool>?}
 ///
 /// `<reading>` is the whole reading, as [encodeReading] writes it (Nick,
-/// 16 Nov: the `admitted` entry carries the reading), so whatever hands the
-/// event to its journey path's apex reads the node from the decision, and
-/// never reads a module's bytes. The placement is `"journeyPath": <id>` for
-/// [UnderJourneyPath]; `"startsJourneyPath": true` and the journey for
-/// [StartsJourneyPath]; the journey alone for [IntoJourney]. The journey is
-/// `"journey": <id>` for [InJourney], or `"startsJourney": true` for
-/// [StartsJourney].
+/// 16 Nov: the entry that admits it carries the reading), so whatever hands
+/// the event to its trajectory's crux reads the node from the decision, and
+/// never reads a module's bytes. The placement is `"trajectory": <id>` for
+/// [OnTrajectory]; `"startsTrajectory": true` and the mission for
+/// [StartsTrajectory]; the mission alone for [IntoMission]. The mission is
+/// `"mission": <id>` for [InMission], or `"startsMission": true` for
+/// [StartsMission].
 ///
-/// [rules] are there exactly when the admission starts a journey or a
-/// journey path: the rules the journey was taken in under, as the
-/// [JourneyRule] gave them, copied into each path it starts. loop_launcher
-/// reads a path's rules from the entry that started it, and the airlock
-/// enforces them; the docking station passes them through unread.
+/// [rules] are there exactly when the admission starts a mission or a
+/// trajectory: the rules the mission was admitted under, as the [JourneyRule]
+/// gave them, copied into each trajectory it starts. loop_launcher reads a
+/// trajectory's rules from the entry that started it, and the airlock enforces
+/// them; the docking station passes them through unread.
 ///
-/// [startsTurn] is there exactly when the reading is [MessageSaid]: whether
-/// the agent answers it, as the [TurnRule] said. Something said that starts
-/// no turn is still admitted under its conversation's journey path, so the
-/// agent has it as context (Nick, 16 Nov: "yeah that sounds right", to
-/// admitting it rather than declining it). It never starts a journey path,
-/// since a path brings up an agent loop: one that starts no turn where its
-/// conversation has no path yet is [SaidStartsNoTurn].
+/// [startsTurn] is there exactly when the reading is [MessageSaid]: whether the
+/// agent answers it, as the [TurnRule] said. Something said that starts no turn
+/// is still admitted under its address's trajectory, so the agent has it as
+/// context (Nick, 16 Nov: "yeah that sounds right", to admitting it rather than
+/// declining it). It never starts a trajectory, since a trajectory brings up an
+/// agent loop: one that starts no turn where its address has no trajectory yet
+/// is [SaidStartsNoTurn].
 ///
-/// The reading's [within] is kept so which journey an outside conversation
-/// is can be rebuilt from decisions alone; its [from], for rules about who
-/// starts turns, such as a cap on turns bots start.
-final class EventAdmitted extends AdmissionDecision {
+/// The reading's [containingAddress] is kept so which mission an address in an
+/// external system is can be rebuilt from decisions alone; its [from], for
+/// rules about who starts turns, such as a cap on turns bots start.
+final class EventAdmittedToMission extends AdmissionDecision {
   /// Throws an [ArgumentError] when [rules] are given for an admission
   /// that starts nothing, or missing for one that starts something; when
   /// [startsTurn] is given for anything but something said, or missing for
-  /// something said; and when something said starts a journey path but no
+  /// something said; and when something said starts a trajectory but no
   /// turn.
-  EventAdmitted(
+  EventAdmittedToMission(
     super.event, {
     required super.by,
     required this.reading,
@@ -175,7 +185,7 @@ final class EventAdmitted extends AdmissionDecision {
       throw ArgumentError.value(
         rules,
         'rules',
-        'given exactly when the admission starts a journey or a path',
+        'given exactly when the admission starts a mission or a trajectory',
       );
     }
     if ((startsTurn != null) != (reading is MessageSaid)) {
@@ -185,11 +195,11 @@ final class EventAdmitted extends AdmissionDecision {
         'given exactly when the reading is something said',
       );
     }
-    if (placement is StartsJourneyPath && startsTurn == false) {
+    if (placement is StartsTrajectory && startsTurn == false) {
       throw ArgumentError.value(
         startsTurn,
         'startsTurn',
-        'something said that starts no turn starts no journey path',
+        'something said that starts no turn starts no trajectory',
       );
     }
   }
@@ -202,14 +212,15 @@ final class EventAdmitted extends AdmissionDecision {
   /// anything else.
   final bool? startsTurn;
 
-  /// Whether [placement] starts a journey path or a journey.
+  /// Whether [placement] starts a trajectory or a mission.
   static bool starts(AdmittedPlacement placement) => switch (placement) {
-    StartsJourneyPath() || IntoJourney(journey: StartsJourney()) => true,
-    UnderJourneyPath() || IntoJourney(journey: InJourney()) => false,
+    StartsTrajectory() || IntoMission(mission: StartsMission()) => true,
+    OnTrajectory() || IntoMission(mission: InMission()) => false,
   };
 
-  ConversationId get conversation => reading.conversation;
-  ConversationId? get within => reading.within;
+  AddressInExternalSystem get addressInExternalSystem =>
+      reading.addressInExternalSystem;
+  AddressInExternalSystem? get containingAddress => reading.containingAddress;
   EventKey get key => reading.key;
   ActorId? get from => reading.from;
 
@@ -217,78 +228,81 @@ final class EventAdmitted extends AdmissionDecision {
   SourceMessageId? get message => switch (reading) {
     MessageSaid(:final message) || MessageChanged(:final message) => message,
     ShownMessageJudged(:final to) => to,
-    ConversationJoined() => null,
+    ActorsJoinedAddress() => null,
   };
 }
 
-/// [journey] ended, at [event]: its loops stop, its programs close and its
-/// users are freed (loop_launcher), and the record takes nothing more on
-/// its paths' chains (is_journal). The person's next message in it opens it
-/// again, on a new path (RULINGS).
+/// [mission] ended, at [event]: its loops stop, its programs close and its
+/// users are freed (loop_launcher), and the record takes nothing more on its
+/// trajectories' chains (is_journal). The person's next message in it opens it
+/// again, on a new trajectory (RULINGS).
 ///
-/// The docking station ends journeys (Nick, 16 Nov: "probably the docking
-/// station should end a journey, no?", and not as a tool of the agent's).
-/// What event ends one is not decided yet, so nothing decides one here; it
-/// is read back like any other decision.
+/// The docking station ends missions (Nick, 16 Nov, of journeys since
+/// renamed missions: "probably the docking station should end a journey,
+/// no?", and not as a tool of the agent's). What event ends one is not
+/// decided yet, so nothing decides one here; it is read back like any other
+/// decision.
 ///
-/// The entry, of kind `ended`:
+/// The entry, of kind `mission-ended`:
 ///
-///     {"event": <hex>, "by": <who>, "journey": <id>}
-final class JourneyEnded extends AdmissionDecision {
-  const JourneyEnded(super.event, {required super.by, required this.journey});
+///     {"event": <hex>, "by": <who>, "mission": <id>}
+final class MissionEnded extends AdmissionDecision {
+  const MissionEnded(super.event, {required super.by, required this.mission});
 
-  final JourneyId journey;
+  final JourneyId mission;
 }
 
-/// [event] declined: nothing comes of it, and nothing will, whatever
+/// [event] not admitted to any mission: nothing comes of it, and nothing
+/// will, whatever
 /// changes later. The case says why.
 ///
-/// The entry, of kind `declined`:
+/// The entry, of kind `event-not-admitted-to-mission`:
 ///
 ///     {"event": <hex>, "by": <who>, "why": <case>, ...the case's own fields}
 ///
 /// `<case>` is `no-reading-for-source`, `reading-found-nothing`,
-/// `duplicate-event`, `conversation-not-taken-in`, `said-starts-no-turn`,
-/// `shown-message-judged-unplaced` or `change-to-unadmitted-message`.
-sealed class EventDeclined extends AdmissionDecision {
-  const EventDeclined(super.event, {required super.by});
+/// `duplicate-event`, `address-not-admitted-to-mission`,
+/// `said-starts-no-turn`, `judged-message-has-no-trajectory` or
+/// `change-to-unadmitted-message`.
+sealed class EventNotAdmittedToMission extends AdmissionDecision {
+  const EventNotAdmittedToMission(super.event, {required super.by});
 }
 
 /// No reading takes the event's source, or its body is not what a relay
 /// records. A source whose module has no reading yet has its events
-/// declined, so a reading added later starts from the events after it.
-final class NoReadingForSource extends EventDeclined {
+/// not admitted, so a reading added later starts from the events after it.
+final class NoReadingForSource extends EventNotAdmittedToMission {
   const NoReadingForSource(super.event, {required super.by});
 }
 
 /// The module's reading found nothing to admit.
-final class ReadingFoundNothing extends EventDeclined {
+final class ReadingFoundNothing extends EventNotAdmittedToMission {
   const ReadingFoundNothing(super.event, {required super.by});
 }
 
-/// An event a reading named by its key, declined. A key is decided once,
+/// An event a reading named by its key, not admitted. A key is decided once,
 /// whichever way it went, so a second event with the same key is a
-/// [DuplicateEvent], even when the first was declined.
-sealed class DeclinedKeyedEvent extends EventDeclined {
-  const DeclinedKeyedEvent(
+/// [DuplicateEvent], even when the first was not admitted.
+sealed class NotAdmittedKeyedEvent extends EventNotAdmittedToMission {
+  const NotAdmittedKeyedEvent(
     super.event, {
     required super.by,
-    required this.conversation,
+    required this.addressInExternalSystem,
     required this.key,
   });
 
-  final ConversationId conversation;
+  final AddressInExternalSystem addressInExternalSystem;
   final EventKey key;
 }
 
-/// [key] in [conversation] was decided already, at the event [of]: its
-/// relay recorded one thing twice, as two events with one key.
+/// [key] in [addressInExternalSystem] was decided already, at the event [of]:
+/// its relay recorded one thing twice, as two events with one key.
 /// `"of": <hex>`.
-final class DuplicateEvent extends DeclinedKeyedEvent {
+final class DuplicateEvent extends NotAdmittedKeyedEvent {
   const DuplicateEvent(
     super.event, {
     required super.by,
-    required super.conversation,
+    required super.addressInExternalSystem,
     required super.key,
     required this.of,
   });
@@ -296,48 +310,49 @@ final class DuplicateEvent extends DeclinedKeyedEvent {
   final EntryHash of;
 }
 
-/// [conversation]'s journey hasn't started, and the journey rule doesn't
-/// take it in. The next event from it is asked about again.
-final class ConversationNotTakenIn extends DeclinedKeyedEvent {
-  const ConversationNotTakenIn(
+/// [addressInExternalSystem]'s mission hasn't started, and the
+/// [JourneyRule] doesn't admit it. The next event from it is asked about
+/// again.
+final class AddressNotAdmittedToMission extends NotAdmittedKeyedEvent {
+  const AddressNotAdmittedToMission(
     super.event, {
     required super.by,
-    required super.conversation,
+    required super.addressInExternalSystem,
     required super.key,
   });
 }
 
-/// Something said that the turn rule says starts no turn, in a conversation
-/// with no journey path yet. Where it has one, it is admitted, with
-/// [EventAdmitted.startsTurn] false.
-final class SaidStartsNoTurn extends DeclinedKeyedEvent {
+/// Something said that the turn rule says starts no turn, in an address
+/// with no trajectory yet. Where it has one, it is admitted, with
+/// [EventAdmittedToMission.startsTurn] false.
+final class SaidStartsNoTurn extends NotAdmittedKeyedEvent {
   const SaidStartsNoTurn(
     super.event, {
     required super.by,
-    required super.conversation,
+    required super.addressInExternalSystem,
     required super.key,
   });
 }
 
-/// A verdict in [conversation], which is under no journey path, so no turn
-/// of the agent's there could have shown what was judged.
-final class ShownMessageJudgedUnplaced extends DeclinedKeyedEvent {
-  const ShownMessageJudgedUnplaced(
+/// A verdict in [addressInExternalSystem], which is under no trajectory, so no
+/// turn of the agent's there could have shown what was judged.
+final class JudgedMessageHasNoTrajectory extends NotAdmittedKeyedEvent {
+  const JudgedMessageHasNoTrajectory(
     super.event, {
     required super.by,
-    required super.conversation,
+    required super.addressInExternalSystem,
     required super.key,
   });
 }
 
 /// A change to [message], which was never admitted, or was admitted in a
-/// journey since ended, so there is no turn for it to change.
+/// mission since ended, so there is no turn for it to change.
 /// `"message": <source>`.
-final class ChangeToUnadmittedMessage extends DeclinedKeyedEvent {
+final class ChangeToUnadmittedMessage extends NotAdmittedKeyedEvent {
   const ChangeToUnadmittedMessage(
     super.event, {
     required super.by,
-    required super.conversation,
+    required super.addressInExternalSystem,
     required super.key,
     required this.message,
   });
