@@ -29,13 +29,10 @@ dependency_overrides:
   # this package wins.
   is_docking_station:
     path: ..
-  # is_flight_rules needs is_effects 0.7.0 (ModelSignInName), not on pub.dev
-  # yet; this is its 0.7.0, from effects' open PR 4. Drop it once 0.7.0 is
-  # published. It binds here only because this package is the one built.
-  is_effects:
-    git:
-      url: https://github.com/intersyntactic/effects.git
-      ref: b313ac87
+  # is_teams_module asks for is_effects ^0.1.0 and is_flight_rules for ^0.7.0,
+  # and a program has one is_effects. Drop this once teams_module moves to
+  # ^0.7.0 (teams-module-e2's task 147).
+  is_effects: ^0.7.0
 
 dev_dependencies:
   is_conversation_shapes: ^0.8.0
