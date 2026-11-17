@@ -52,9 +52,8 @@ final class DecidedSoFar {
 
   /// The trajectory [addressInExternalSystem] is under. Null when it is under
   /// none yet.
-  TrajectoryId? trajectoryOf(
-    AddressInExternalSystem addressInExternalSystem,
-  ) => _trajectories[addressInExternalSystem];
+  TrajectoryId? trajectoryOf(AddressInExternalSystem addressInExternalSystem) =>
+      _trajectories[addressInExternalSystem];
 
   /// The mission [outside] is: an address others sit within, such as a
   /// channel, or one that sits within nothing, such as a chat. Null before
