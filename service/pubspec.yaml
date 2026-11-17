@@ -32,6 +32,6 @@ dependency_overrides:
 
 dev_dependencies:
   is_conversation_shapes: ^0.8.2
-  is_shapes: ^0.5.0
+  is_shapes: '>=0.5.0 <0.7.0'
   lints: ^6.1.0
   test: ^1.33.0

@@ -17,7 +17,7 @@ dependencies:
   # airlock that imports it reaches no socket code.
   is_logbook: ^0.2.0
   is_logbook_client: ^0.2.0
-  is_shapes: ^0.5.0
+  is_shapes: '>=0.5.0 <0.7.0'
 
 dev_dependencies:
   lints: ^6.1.0
