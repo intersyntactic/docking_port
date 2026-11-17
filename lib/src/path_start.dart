@@ -15,7 +15,7 @@ import 'dart:typed_data';
 
 import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart'
-    show DecidedBy, JourneyId, JourneyPathId;
+    show DecidedBy, MissionId, TrajectoryId;
 
 /// What an `event-admitted-to-mission` entry says about the trajectories it
 /// starts: [EntryStartsTrajectory], [EntryStartsNoTrajectory], or
@@ -38,8 +38,8 @@ final class EntryStartsTrajectory<R> extends AdmittedTrajectoryEntry<R> {
   /// The event admitted, by its entry's hash.
   final EntryHash event;
   final DecidedBy by;
-  final JourneyPathId trajectory;
-  final JourneyId mission;
+  final TrajectoryId trajectory;
+  final MissionId mission;
   final R rules;
 }
 
@@ -110,13 +110,13 @@ AdmittedTrajectoryEntry<R> readTrajectoryStart<R>(
 
   // Where it goes: under a trajectory, or into a mission, starting a trajectory
   // or not.
-  JourneyPathId? onTrajectory;
-  JourneyId? inMission;
+  TrajectoryId? onTrajectory;
+  MissionId? inMission;
   var startsMission = false;
   var startsTrajectory = false;
   if (json.containsKey('trajectory')) {
     onTrajectory = switch (json['trajectory']) {
-      final String hex => JourneyPathId.parse(hex),
+      final String hex => TrajectoryId.parse(hex),
       _ => null,
     };
     if (onTrajectory == null) return unreadable('`trajectory` is not an id');
@@ -127,7 +127,7 @@ AdmittedTrajectoryEntry<R> readTrajectoryStart<R>(
     }
     if (json.containsKey('mission')) {
       inMission = switch (json['mission']) {
-        final String hex => JourneyId.parse(hex),
+        final String hex => MissionId.parse(hex),
         _ => null,
       };
       if (inMission == null) return unreadable('`mission` is not an id');
@@ -187,8 +187,8 @@ AdmittedTrajectoryEntry<R> readTrajectoryStart<R>(
   return EntryStartsTrajectory(
     event: event,
     by: by,
-    trajectory: JourneyPathId.of(entry),
-    mission: inMission ?? JourneyId.of(entry),
+    trajectory: TrajectoryId.of(entry),
+    mission: inMission ?? MissionId.of(entry),
     rules: read as R,
   );
 }

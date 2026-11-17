@@ -7,7 +7,7 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_logbook/is_logbook.dart' show EntryHash;
-import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy, JourneyId;
+import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy, MissionId;
 import 'package:test/test.dart';
 
 final class _All implements JourneyRule, TurnRule {
@@ -148,7 +148,7 @@ void main() {
         isA<InMission>().having(
           (j) => j.mission,
           'mission',
-          JourneyId.parse(_hash('decision A').hex),
+          MissionId.parse(_hash('decision A').hex),
         ),
       ),
     );
@@ -185,7 +185,7 @@ void main() {
     }
 
     final first = step('a') as EventAdmittedToMission;
-    final mission = JourneyId.parse(_hash('decision a').hex)!;
+    final mission = MissionId.parse(_hash('decision a').hex)!;
     expect(
       step('b'),
       isA<EventAdmittedToMission>().having(

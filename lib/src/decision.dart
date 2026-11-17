@@ -31,7 +31,7 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
 import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_logbook/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
-    show ActorId, DecidedBy, JourneyId, JourneyPathId;
+    show ActorId, DecidedBy, MissionId, TrajectoryId;
 
 import 'reading.dart';
 import 'rules.dart';
@@ -75,12 +75,12 @@ sealed class AdmittedPlacement {
 final class OnTrajectory extends AdmittedPlacement {
   const OnTrajectory(this.trajectory);
 
-  final JourneyPathId trajectory;
+  final TrajectoryId trajectory;
 }
 
 /// Under a new trajectory in [mission], which the admission starts and is named
 /// by: its id is the hash of the `event-admitted-to-mission` entry that started
-/// it. A [JourneyPathId] is given by whoever starts the trajectory, and here
+/// it. A [TrajectoryId] is given by whoever starts the trajectory, and here
 /// that is the docking station, so the entry that started it is its one name,
 /// the way a turn's id is the hash of its entry.
 final class StartsTrajectory extends AdmittedPlacement {
@@ -99,7 +99,7 @@ final class IntoMission extends AdmittedPlacement {
 /// Which mission: [InMission], one already started, or [StartsMission], a new
 /// one the admission starts. A mission the docking station starts is named like
 /// a trajectory it starts, by the `event-admitted-to-mission` entry's hash, as
-/// a [JourneyId]. One entry can start both, as a chat's first message does, and
+/// a [MissionId]. One entry can start both, as a chat's first message does, and
 /// then both have its hash, as two kinds of name.
 sealed class MissionPlacement {
   const MissionPlacement();
@@ -109,7 +109,7 @@ sealed class MissionPlacement {
 final class InMission extends MissionPlacement {
   const InMission(this.mission);
 
-  final JourneyId mission;
+  final MissionId mission;
 }
 
 /// In a new mission, which the admission starts.
@@ -248,7 +248,7 @@ final class EventAdmittedToMission extends AdmissionDecision {
 final class MissionEnded extends AdmissionDecision {
   const MissionEnded(super.event, {required super.by, required this.mission});
 
-  final JourneyId mission;
+  final MissionId mission;
 }
 
 /// [event] not admitted to any mission: nothing comes of it, and nothing

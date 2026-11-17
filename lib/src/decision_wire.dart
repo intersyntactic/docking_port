@@ -11,7 +11,7 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
 import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_logbook/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
-    show DecidedBy, JourneyId, JourneyPathId;
+    show DecidedBy, MissionId, TrajectoryId;
 
 import 'decision.dart';
 import 'reading.dart';
@@ -108,7 +108,7 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
     return _notAdmitted(event, by, json);
   }
   if (kind == DecisionEntryKind.missionEnded) {
-    final mission = _read(json['mission'], JourneyId.parse);
+    final mission = _read(json['mission'], MissionId.parse);
     if (mission == null || json.length != 3) return null;
     return MissionEnded(event, by: by, mission: mission);
   }
@@ -136,7 +136,7 @@ EventAdmittedToMission? _admitted(
 
   final AdmittedPlacement placement;
   if (json.containsKey('trajectory')) {
-    final trajectory = _read(json['trajectory'], JourneyPathId.parse);
+    final trajectory = _read(json['trajectory'], TrajectoryId.parse);
     if (trajectory == null) return null;
     fields.add('trajectory');
     placement = OnTrajectory(trajectory);
@@ -185,7 +185,7 @@ MissionPlacement? _readMission(Map<String, Object?> json, Set<String> fields) {
   final starts = json.containsKey('startsMission');
   if (inMission == starts) return null;
   if (inMission) {
-    final mission = _read(json['mission'], JourneyId.parse);
+    final mission = _read(json['mission'], MissionId.parse);
     if (mission == null) return null;
     fields.add('mission');
     return InMission(mission);
