@@ -1,11 +1,11 @@
 /// The docking station as a service: it reads the record through the
-/// journal's read socket, decides each event, and sends each decision
-/// through the journal's write socket (RULINGS, "The docking station admits
+/// logbook's read socket, decides each event, and sends each decision
+/// through the logbook's write socket (RULINGS, "The docking station admits
 /// events under journey paths").
 ///
 ///   dart run bin/docking_station.dart
-///     --read-socket=/run/.../read.sock     the journal's read socket
-///     --write-socket=/run/.../write.sock   the journal's write socket
+///     --read-socket=/run/.../read.sock     the logbook's read socket
+///     --write-socket=/run/.../write.sock   the logbook's write socket
 ///     --config=/etc/.../config.json        the addresses let in, as
 ///                                          [AddressesLetIn] reads them
 ///     --what-may-leave-this-machine=/etc/.../hart.json
@@ -23,7 +23,7 @@ import 'dart:io';
 
 import 'package:docking_station_service/docking_station_service.dart';
 import 'package:is_docking_station/is_docking_station.dart';
-import 'package:is_journal_client/is_journal_client.dart';
+import 'package:is_logbook_client/is_logbook_client.dart';
 import 'package:is_teams_module/is_teams_module.dart' show TeamsReading;
 
 const _options = {
@@ -66,8 +66,8 @@ Future<void> main(List<String> arguments) async {
     ),
   );
 
-  final reader = JournalReader(given['read-socket']!);
-  final writer = JournalWriter(given['write-socket']!);
+  final reader = LogbookReader(given['read-socket']!);
+  final writer = LogbookWriter(given['write-socket']!);
   stderr.writeln(
     'docking station: ${addressesLetIn.addresses.length} addresses let in, '
     'start entry of kind $startKind',
