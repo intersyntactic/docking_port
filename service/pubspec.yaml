@@ -21,7 +21,7 @@ dependencies:
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
-      ref: 106ccb7
+      ref: 46ad868485d9b63a9a8c7e401a3bcc9ab7ce0f35
 
 dependency_overrides:
   # is_teams_module pins is_docking_station to a commit of its own; pub won't
@@ -29,14 +29,6 @@ dependency_overrides:
   # this package wins.
   is_docking_station:
     path: ..
-  # is_teams_module asks for is_effects ^0.1.0 and is_flight_rules for ^0.7.0,
-  # and a program has one is_effects. Drop this once teams_module moves to
-  # ^0.7.0 (teams-module-e2's task 147). Pinned to the v0.7.0 tag's commit
-  # while pub.dev's package listing catches up with the published 0.7.0.
-  is_effects:
-    git:
-      url: https://github.com/intersyntactic/effects.git
-      ref: ddb49d469de752417da6145431cf3536d69ad73f
 
 dev_dependencies:
   is_conversation_shapes: ^0.8.0
