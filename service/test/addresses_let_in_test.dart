@@ -15,7 +15,7 @@ const _chat = 'teams:19:chat@thread.v2';
 
 /// A rules file as Hart's bot might have it.
 const _rulesFile = {
-  'modelSignInsTheLoopIsGiven': ['claude-team'],
+  'modelSignInsCallsMayGoOutAs': ['claude-team'],
   'sitesTheWebDriverMayReach': [
     {
       'site': 'https://docs.example.com',

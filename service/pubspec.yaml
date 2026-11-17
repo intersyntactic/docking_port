@@ -16,7 +16,7 @@ dependencies:
   is_flight_rules:
     git:
       url: https://github.com/intersyntactic/flight_rules.git
-      ref: 0664435a
+      ref: 4a8a4dfa
   is_journal_client: ^0.1.2
   is_teams_module:
     git:
