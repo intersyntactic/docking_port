@@ -13,7 +13,7 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook/is_logbook.dart' show ObjectId;
 import 'package:is_shapes/is_shapes.dart'
     show DecidedBy, MissionId, TrajectoryId;
 
@@ -36,7 +36,7 @@ final class EntryStartsTrajectory<R> extends AdmittedTrajectoryEntry<R> {
   });
 
   /// The event admitted, by its entry's hash.
-  final EntryHash event;
+  final ObjectId event;
   final DecidedBy by;
   final TrajectoryId trajectory;
   final MissionId mission;
@@ -93,7 +93,7 @@ AdmittedTrajectoryEntry<R> readTrajectoryStart<R>(
   final fields = {'event', 'by', 'reading'};
 
   final event = switch (json['event']) {
-    final String hex => EntryHash.parse(hex),
+    final String hex => ObjectId.parse(hex),
     _ => null,
   };
   if (event == null) return unreadable('`event` is not an entry hash');

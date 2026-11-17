@@ -30,10 +30,10 @@ final class _Record {
 
   final _entries = <Entry>[];
   final _subscribers = <(Set<Kind>, StreamController<Subscribed>)>[];
-  EntryHash? _tip;
+  ObjectId? _tip;
 
   /// Each decision sent, refused or not, with the previous it named.
-  final sent = <(EntryHash?, AdmissionDecision)>[];
+  final sent = <(ObjectId?, AdmissionDecision)>[];
 
   /// Run once, as the next decision is sent, before it is checked.
   void Function()? beforeNextSend;
@@ -41,32 +41,36 @@ final class _Record {
   /// What every decision sent is answered with instead, when set.
   WriteResult? answer;
 
+  /// When set, the next decision sent is recorded first, byte for byte, as
+  /// if another docking station had sent the same decision just before.
+  bool sameBytesFirst = false;
+
   /// The decisions recorded, in order.
   List<AdmissionDecision> get decisions => [
-    for (final entry in _entries) ?decodeDecision(entry.kind!, entry.body),
+    for (final entry in _entries) ?decodeDecision(entry.kind, entry.body),
   ];
 
-  /// The first start entry's hash.
-  EntryHash get startEntry =>
-      _entries.firstWhere((e) => e.kind!.name == _startKind).hash;
+  /// The first start entry's id.
+  ObjectId get startEntry =>
+      _entries.firstWhere((e) => e.kind.name == _startKind).id;
 
-  /// The hashes of the decisions recorded, in order.
-  List<EntryHash> get decisionEntries => [
+  /// The ids of the decisions recorded, in order.
+  List<ObjectId> get decisionEntries => [
     for (final entry in _entries)
-      if (decodeDecision(entry.kind!, entry.body) != null) entry.hash,
+      if (decodeDecision(entry.kind, entry.body) != null) entry.id,
   ];
 
-  Entry add(String kind, EntryHash? previous, List<int> body) {
+  Entry add(String kind, ObjectId? previous, List<int> body) {
     final header = utf8.encode('$kind\n${previous?.hex ?? '-'}\n');
     final bytes = Uint8List.fromList([...header, ...body]);
-    // A kind made from its name, never one of the docking station's own, so
-    // the docking station has to compare kinds by value.
+    // Named by the sha256 of its text, as the logbook names it. A kind made
+    // from its name, never one of the docking station's own, so the docking
+    // station has to compare kinds by value.
     final entry = Entry(
-      hash: EntryHash.of(bytes),
+      id: ObjectId.of(bytes),
       kind: Kind.parse(kind)!,
       previous: previous,
       recorded: bytes,
-      checked: false,
     );
     _entries.add(entry);
     for (final (kinds, subscriber) in _subscribers) {
@@ -97,14 +101,14 @@ final class _Record {
   /// thing a decision names as previous.
   Entry start() {
     final entry = add(_startKind, null, utf8.encode('{}'));
-    _tip ??= entry.hash;
+    _tip ??= entry.id;
     return entry;
   }
 
   /// [decision], sent by another docking station, naming the tip.
   void decideElsewhere(AdmissionDecision decision) {
     final (kind, body) = encodeDecision(decision);
-    _tip = add(kind.name, _tip, body).hash;
+    _tip = add(kind.name, _tip, body).id;
   }
 
   Stream<Subscribed> subscribe(Set<Kind> kinds) {
@@ -112,7 +116,7 @@ final class _Record {
     for (final entry in _entries) {
       if (kinds.contains(entry.kind)) subscriber.add(entry);
     }
-    subscriber.add(CaughtUp(_entries.lastOrNull?.hash));
+    subscriber.add(CaughtUp(_entries.lastOrNull?.id));
     _subscribers.add((kinds, subscriber));
     return subscriber.stream;
   }
@@ -120,17 +124,29 @@ final class _Record {
   Future<WriteResult> send(
     Kind kind,
     List<int> body, {
-    EntryHash? previous,
+    ObjectId? previous,
   }) async {
     sent.add((previous, decodeDecision(kind, Uint8List.fromList(body))!));
     final before = beforeNextSend;
     beforeNextSend = null;
     before?.call();
+    if (sameBytesFirst) {
+      sameBytesFirst = false;
+      _tip = add(kind.name, previous, body).id;
+    }
     if (answer case final answer?) return answer;
+    // As the logbook does: bytes already in are answered before the tip is
+    // checked, since their header names the previous they were sent after.
+    final id = ObjectId.of(
+      Uint8List.fromList([
+        ...utf8.encode('${kind.name}\n${previous?.hex ?? '-'}\n'),
+        ...body,
+      ]),
+    );
+    if (_entries.any((entry) => entry.id == id)) return AlreadyRecorded(id);
     if (previous != _tip) return NotTip(_tip!);
-    final hash = add(kind.name, previous, body).hash;
-    _tip = hash;
-    return Written(hash);
+    _tip = add(kind.name, previous, body).id;
+    return Written(_tip!);
   }
 
   Future<void> close() async {
@@ -144,7 +160,7 @@ final class _Record {
 /// saying it in [chat]; anything else as nothing to admit. Keeps which
 /// events it was given, in order.
 final class _Reading implements ModuleReading<int> {
-  final given = <EntryHash>[];
+  final given = <ObjectId>[];
 
   @override
   String get source => 'test';
@@ -208,7 +224,7 @@ Future<void> _runToEnd(_Record record, _Reading reading) async {
   await running;
 }
 
-EventAdmittedToMission _startsChat(EntryHash event, String key) =>
+EventAdmittedToMission _startsChat(ObjectId event, String key) =>
     EventAdmittedToMission(
       event,
       by: DecidedBy.rules,
@@ -238,7 +254,7 @@ void main() {
     final [(firstPrevious, first), (secondPrevious, second)] = record.sent;
     final [firstEntry, _] = record.decisionEntries;
     expect(firstPrevious, record.startEntry);
-    expect(first.event, a.hash);
+    expect(first.event, a.id);
     expect(first.by, DecidedBy.rules);
     expect(
       (first as EventAdmittedToMission).placement,
@@ -249,7 +265,7 @@ void main() {
       ),
     );
     expect(secondPrevious, firstEntry);
-    expect(second.event, b.hash);
+    expect(second.event, b.id);
     expect(
       ((second as EventAdmittedToMission).placement as OnTrajectory)
           .trajectory
@@ -263,15 +279,15 @@ void main() {
     final record = _Record();
     final reading = _Reading();
     final a = record.recordEvent({'said': 'hello', 'key': 'a'});
-    record.decideElsewhere(_startsChat(a.hash, 'a'));
+    record.decideElsewhere(_startsChat(a.id, 'a'));
     final b = record.recordEvent({'said': 'again', 'key': 'b'});
     await _runToEnd(record, reading);
 
     final aDecision = record.decisionEntries.first;
     final [(previous, decision)] = record.sent;
-    expect(reading.given, [a.hash, b.hash]);
+    expect(reading.given, [a.id, b.id]);
     expect(previous, aDecision);
-    expect(decision.event, b.hash);
+    expect(decision.event, b.id);
     expect(
       ((decision as EventAdmittedToMission).placement as OnTrajectory)
           .trajectory
@@ -292,19 +308,19 @@ void main() {
     await running;
 
     final [(_, decision)] = record.sent;
-    expect(decision.event, c.hash);
-    expect(record.decisions.map((d) => d.event), [c.hash]);
+    expect(decision.event, c.id);
+    expect(record.decisions.map((d) => d.event), [c.id]);
   });
 
   test('when another docking station decided first, takes its decision and '
       'sends nothing more', () async {
     final record = _Record();
     final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
-    record.decideElsewhere(_startsChat(a0.hash, 'a0'));
+    record.decideElsewhere(_startsChat(a0.id, 'a0'));
     final a = record.recordEvent({'said': 'again', 'key': 'a'});
     record.beforeNextSend = () => record.decideElsewhere(
       SaidStartsNoTurn(
-        a.hash,
+        a.id,
         by: DecidedBy.rules,
         addressInExternalSystem: chat,
         key: EventKey.parse('a')!,
@@ -313,7 +329,7 @@ void main() {
     await _runToEnd(record, _Reading());
 
     expect(record.sent, hasLength(1));
-    expect(record.decisions.map((d) => d.event), [a0.hash, a.hash]);
+    expect(record.decisions.map((d) => d.event), [a0.id, a.id]);
     expect(record.decisions.last, isA<SaidStartsNoTurn>());
   });
 
@@ -334,7 +350,7 @@ void main() {
     test('$what, rather than not-tip, stops it', () async {
       final record = _Record();
       final a0 = record.recordEvent({'said': 'hello', 'key': 'a0'});
-      record.decideElsewhere(_startsChat(a0.hash, 'a0'));
+      record.decideElsewhere(_startsChat(a0.id, 'a0'));
       record.recordEvent({'said': 'again', 'key': 'a'});
       record.answer = answer;
 
@@ -372,7 +388,7 @@ void main() {
 
       final [(_, decision)] = record.sent;
       expect(decision, isA<NoReadingForSource>());
-      expect(decision.event, x.hash);
+      expect(decision.event, x.id);
       expect(reading.given, isEmpty);
     },
   );
@@ -387,8 +403,8 @@ void main() {
     final now = record.recordEvent({'said': 'again', 'key': 'b'});
     await _runToEnd(record, reading);
 
-    expect(reading.given, [old.hash, now.hash]);
-    expect(record.decisions.map((d) => d.event), [old.hash, now.hash]);
+    expect(reading.given, [old.id, now.id]);
+    expect(record.decisions.map((d) => d.event), [old.id, now.id]);
   });
 
   test('an event before the start entry is read but never decided, and the '
@@ -400,10 +416,10 @@ void main() {
     final after = record.recordEvent({'said': 'real', 'key': 'b'});
     await _runToEnd(record, reading);
 
-    expect(reading.given, [before.hash, after.hash]);
+    expect(reading.given, [before.id, after.id]);
     final [(previous, decision)] = record.sent;
-    expect(previous, start.hash);
-    expect(decision.event, after.hash);
+    expect(previous, start.id);
+    expect(decision.event, after.id);
   });
 
   test('with no start entry, decides nothing until one comes', () async {
@@ -420,8 +436,8 @@ void main() {
     await running;
 
     final [(previous, decision)] = record.sent;
-    expect(previous, start.hash);
-    expect(decision.event, after.hash);
+    expect(previous, start.id);
+    expect(decision.event, after.id);
   });
 
   test('when two docking stations make the first decision at once, the '
@@ -429,13 +445,31 @@ void main() {
     final record = _Record();
     final a = record.recordEvent({'said': 'hello', 'key': 'a'});
     record.beforeNextSend = () =>
-        record.decideElsewhere(_startsChat(a.hash, 'a'));
+        record.decideElsewhere(_startsChat(a.id, 'a'));
     await _runToEnd(record, _Reading());
 
     // Its own first decision named the start entry, as the other's did,
     // so the record refused it rather than starting a second chain.
     expect(record.sent, hasLength(1));
-    expect(record.decisions.map((d) => d.event), [a.hash]);
+    expect(record.decisions.map((d) => d.event), [a.id]);
+  });
+
+  test('a decision whose exact bytes are already in is taken as written, '
+      'and the next names it', () async {
+    final record = _Record();
+    final a = record.recordEvent({'said': 'hello', 'key': 'a'});
+    record.sameBytesFirst = true;
+    final running = _run(record, _Reading());
+    await pumpEventQueue();
+    final b = record.recordEvent({'said': 'again', 'key': 'b'});
+    await pumpEventQueue();
+    await record.close();
+    await running;
+
+    // Recorded once, not twice, and the docking station went on.
+    expect(record.decisions.map((d) => d.event), [a.id, b.id]);
+    final [_, (previous, _)] = record.sent;
+    expect(previous, record.decisionEntries.first);
   });
 
   test('a second start entry stops it', () async {
@@ -452,7 +486,7 @@ void main() {
   test('a decision before the start entry stops it', () async {
     final record = _Record(started: false);
     final a = record.recordEvent({'said': 'hello', 'key': 'a'});
-    record.decideElsewhere(_startsChat(a.hash, 'a'));
+    record.decideElsewhere(_startsChat(a.id, 'a'));
     record.start();
 
     await expectLater(

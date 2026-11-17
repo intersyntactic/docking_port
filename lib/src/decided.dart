@@ -7,7 +7,7 @@ library;
 import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook_client/is_logbook_client.dart' show ObjectId;
 import 'package:is_shapes/is_shapes.dart' show MissionId, TrajectoryId;
 
 import 'decision.dart';
@@ -25,10 +25,10 @@ import 'reading.dart';
 /// `not-tip` refusal means another docking station decided first, and its
 /// decision comes on the record to be taken like any other.
 final class DecidedSoFar {
-  EntryHash? _tip;
-  final _taken = <EntryHash>{};
-  final _decidedEvents = <EntryHash>{};
-  final _events = <(AddressInExternalSystem, EventKey), EntryHash>{};
+  ObjectId? _tip;
+  final _taken = <ObjectId>{};
+  final _decidedEvents = <ObjectId>{};
+  final _events = <(AddressInExternalSystem, EventKey), ObjectId>{};
   final _trajectories = <AddressInExternalSystem, TrajectoryId>{};
   final _trajectoryMissions = <TrajectoryId, MissionId>{};
   final _missions = <AddressInExternalSystem, MissionId>{};
@@ -38,14 +38,14 @@ final class DecidedSoFar {
 
   /// The last decision: what the next one names as previous. Null before the
   /// first.
-  EntryHash? get tip => _tip;
+  ObjectId? get tip => _tip;
 
   /// Whether [event] has been decided.
-  bool has(EntryHash event) => _decidedEvents.contains(event);
+  bool has(ObjectId event) => _decidedEvents.contains(event);
 
   /// The event that [key] in [addressInExternalSystem] was decided at,
   /// whichever way it went. Null when no event with that key has been decided.
-  EntryHash? decidedAt(
+  ObjectId? decidedAt(
     AddressInExternalSystem addressInExternalSystem,
     EventKey key,
   ) => _events[(addressInExternalSystem, key)];
@@ -78,7 +78,7 @@ final class DecidedSoFar {
   /// An entry already taken is ignored, so the docking station's own decision,
   /// taken when the record accepts it and read back later, can never move
   /// [tip] back.
-  void take(EntryHash entry, AdmissionDecision decision) {
+  void take(ObjectId entry, AdmissionDecision decision) {
     if (!_taken.add(entry)) return;
     _tip = entry;
     _decidedEvents.add(decision.event);
@@ -117,7 +117,7 @@ final class DecidedSoFar {
     );
   }
 
-  void _admit(EntryHash entry, EventAdmittedToMission admitted) {
+  void _admit(ObjectId entry, EventAdmittedToMission admitted) {
     final EventAdmittedToMission(:addressInExternalSystem, :key, :message) =
         admitted;
     _events[(addressInExternalSystem, key)] = admitted.event;
@@ -147,7 +147,7 @@ final class DecidedSoFar {
 
   /// Starts the mission [outside] is, named by [entry], under [rules].
   MissionId _start(
-    EntryHash entry,
+    ObjectId entry,
     AddressInExternalSystem outside,
     JsonObject rules,
   ) {

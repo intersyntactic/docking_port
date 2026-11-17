@@ -16,7 +16,7 @@ import 'package:is_annotation_shapes/is_annotation_shapes.dart'
     show VerdictOnShownMessage;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid, WhatChanged;
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook_client/is_logbook_client.dart' show ObjectId;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
 
 /// One event, as the docking station gives it to a reading: its entry's hash,
@@ -35,7 +35,7 @@ final class RelayedEvent {
 
   /// The entry's hash: what an admission and the turn made from it name
   /// the event by.
-  final EntryHash entry;
+  final ObjectId entry;
 
   /// When the relay took it in.
   final DateTime at;
@@ -48,7 +48,7 @@ final class RelayedEvent {
 
   /// The event recorded at [entry], from its [body] as the relay recorded it.
   /// Null for anything else: it is our own wire, read strictly.
-  static RelayedEvent? read(EntryHash entry, Uint8List body) {
+  static RelayedEvent? read(ObjectId entry, Uint8List body) {
     final Object? json;
     try {
       json = jsonDecode(utf8.decode(body));

@@ -14,7 +14,12 @@ dependencies:
   is_docking_station:
     path: ..
   is_flight_rules: ^0.1.0
-  is_logbook_client: ^0.1.0
+  # The same source as the library's, until is_logbook_client 0.2.0 is on
+  # pub.dev.
+  is_logbook_client:
+    git:
+      url: https://github.com/intersyntactic/logbook_client.git
+      ref: fcb4c498f8213d49b500d61a14925e8eb46dc624
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
