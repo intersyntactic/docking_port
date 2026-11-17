@@ -2,7 +2,7 @@
 library;
 
 import 'package:checked_json/checked_json.dart' show JsonObject;
-import 'package:is_journal/is_journal.dart' show EntryHash;
+import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show DecidedBy;
 
 import 'decided.dart';

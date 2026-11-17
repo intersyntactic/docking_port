@@ -28,8 +28,8 @@ library;
 import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
-import 'package:is_journal/is_journal.dart' show EntryHash;
-import 'package:is_journal/service.dart' show Kind;
+import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
     show ActorId, DecidedBy, JourneyId, JourneyPathId;
 
@@ -49,10 +49,9 @@ abstract final class DecisionEntryKind {
     'event-not-admitted-to-mission',
   )!;
 
-  /// A [MissionEnded]'s kind, the journal's own word: it reads it to close
-  /// the mission's chains.
-  // TODO(0.10.0): Kind.missionEnded
-  static final missionEnded = Kind.parse('mission-ended')!;
+  /// A [MissionEnded]'s kind: the logbook's own, since the logbook reads it
+  /// to close the mission's chains.
+  static final missionEnded = Kind.missionEnded;
 
   /// Every kind above, as the docking station subscribes to its own
   /// decisions.
@@ -234,7 +233,7 @@ final class EventAdmittedToMission extends AdmissionDecision {
 
 /// [mission] ended, at [event]: its loops stop, its programs close and its
 /// users are freed (loop_launcher), and the record takes nothing more on its
-/// trajectories' chains (is_journal). The person's next message in it opens it
+/// trajectories' chains (is_logbook). The person's next message in it opens it
 /// again, on a new trajectory (RULINGS).
 ///
 /// The docking station ends missions (Nick, 16 Nov, of journeys since

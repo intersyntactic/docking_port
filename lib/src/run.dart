@@ -3,7 +3,7 @@
 /// events under journey paths").
 library;
 
-import 'package:is_journal_client/is_journal_client.dart'
+import 'package:is_logbook_client/is_logbook_client.dart'
     show
         CaughtUp,
         Entry,
@@ -41,7 +41,7 @@ final _eventKinds = {Kind.parse('event')!, Kind.parse('arrived')!};
 /// decision is decided under [missions] and [turns], in order, and sent with
 /// [send], naming the decision before it as previous, or the start entry for
 /// the first; so is each event after that, as it comes. [subscribe] and
-/// [send] are a `JournalReader`'s and a `JournalWriter`'s, or stand-ins.
+/// [send] are a `LogbookReader`'s and a `LogbookWriter`'s, or stand-ins.
 ///
 /// The start entry is written once, at setup, by whoever sets the docking
 /// station up, never by the docking station: two of them starting at once

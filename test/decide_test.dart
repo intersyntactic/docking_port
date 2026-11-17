@@ -6,7 +6,7 @@ import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
-import 'package:is_journal/is_journal.dart' show EntryHash;
+import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy, JourneyId;
 import 'package:test/test.dart';
 
