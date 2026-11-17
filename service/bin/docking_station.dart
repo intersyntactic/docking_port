@@ -4,8 +4,8 @@
 /// events under journey paths").
 ///
 ///   dart run bin/docking_station.dart
-///     --read-socket=/run/.../read.sock     the logbook's read socket
-///     --write-socket=/run/.../write.sock   the logbook's write socket
+///     --read-socket=/run/record-read/logbook.sock   the logbook's read socket
+///     --write-socket=/run/record/logbook.sock       the logbook's write socket
 ///     --config=/etc/.../config.json        the addresses let in, as
 ///                                          [AddressesLetIn] reads them
 ///     --what-may-leave-this-machine=/etc/.../hart.json
