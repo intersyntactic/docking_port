@@ -183,7 +183,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.0.1"
+    version: "0.1.0"
   is_effects:
     dependency: transitive
     description:
@@ -236,8 +236,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "9a3a50291ffa4ed16b62beb0f7bf16d746bfde70"
-      resolved-ref: "9a3a50291ffa4ed16b62beb0f7bf16d746bfde70"
+      ref: c2bd93ee76afb033bc0c2d6607b3acf79b93134a
+      resolved-ref: c2bd93ee76afb033bc0c2d6607b3acf79b93134a
       url: "https://github.com/intersyntactic/teams_module.git"
     source: git
     version: "0.0.1"

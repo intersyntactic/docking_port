@@ -18,11 +18,11 @@ dependencies:
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
-      ref: 9a3a50291ffa4ed16b62beb0f7bf16d746bfde70
+      ref: c2bd93ee76afb033bc0c2d6607b3acf79b93134a
 
 dependency_overrides:
-  # is_teams_module pins is_docking_station to a commit of its own; pub won't
-  # mix a git source and a path source for one package, so the library beside
+  # is_teams_module takes is_docking_station from pub.dev; pub won't mix a
+  # hosted source and a path source for one package, so the library beside
   # this package wins.
   is_docking_station:
     path: ..
