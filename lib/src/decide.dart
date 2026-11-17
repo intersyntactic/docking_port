@@ -2,7 +2,7 @@
 library;
 
 import 'package:checked_json/checked_json.dart' show JsonObject;
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook_client/is_logbook_client.dart' show ObjectId;
 import 'package:is_shapes/is_shapes.dart' show DecidedBy;
 
 import 'decided.dart';
@@ -26,7 +26,7 @@ import 'rules.dart';
 /// Every decision it makes is [DecidedBy.rules]: nothing here asks the
 /// person.
 AdmissionDecision decide(
-  EntryHash event,
+  ObjectId event,
   EventReading? reading,
   DecidedSoFar decided, {
   required JourneyRule missions,

@@ -5,10 +5,11 @@ library;
 
 import 'package:is_logbook_client/is_logbook_client.dart'
     show
+        AlreadyRecorded,
         CaughtUp,
         Entry,
-        EntryHash,
         Kind,
+        ObjectId,
         NotTip,
         Subscribed,
         Unanswered,
@@ -65,7 +66,9 @@ final class RecordNoRestartChanges implements Exception {
 /// is a call not made (one start entry, intersyntactic-a8 and this
 /// session's lean, 16 Nov; the open questions hold it).
 ///
-/// When the record answers [NotTip], the decisions' chain has moved on:
+/// When the record answers [AlreadyRecorded], these exact bytes are in, so
+/// this decision is, after the same tip, whoever sent them: it is taken as
+/// if [Written]. When it answers [NotTip], the decisions' chain has moved on:
 /// another docking station decided first, and its decision comes on the
 /// record to be taken like any other. A failed add, or no answer, stops it
 /// with a [StateError]: the decision may or may not be in, and deciding on
@@ -79,7 +82,7 @@ Future<void> runDockingStation({
   required Future<WriteResult> Function(
     Kind kind,
     List<int> body, {
-    EntryHash? previous,
+    ObjectId? previous,
   })
   send,
   required Kind startKind,
@@ -108,14 +111,14 @@ Future<void> runDockingStation({
   }
   final decided = DecidedSoFar();
   // The start entry, once it has come.
-  EntryHash? start;
+  ObjectId? start;
   // Each event after the start entry read but not yet decided, with its
   // reading, in the record's order.
-  final waiting = <EntryHash, EventReading?>{};
+  final waiting = <ObjectId, EventReading?>{};
 
   // Decides each waiting event in order. Returns early when another
   // docking station has decided first: its decisions come on the record.
-  Future<void> decideWaiting(EntryHash start) async {
+  Future<void> decideWaiting(ObjectId start) async {
     while (waiting.isNotEmpty) {
       final MapEntry(key: event, value: reading) = waiting.entries.first;
       final decision = decide(
@@ -128,7 +131,7 @@ Future<void> runDockingStation({
       final (kind, body) = encodeDecision(decision);
       final previous = decided.tip ?? start;
       final entry = switch (await send(kind, body, previous: previous)) {
-        Written(:final entry) => entry,
+        Written(:final entry) || AlreadyRecorded(:final entry) => entry,
         NotTip() => null,
         WriteRefused(:final why) => throw RecordNoRestartChanges(
           'the decision on ${event.hex} was refused: $why',
@@ -147,37 +150,34 @@ Future<void> runDockingStation({
   final kinds = {..._eventKinds, ...DecisionEntryKind.all, startKind};
   await for (final item in subscribe(kinds)) {
     switch (item) {
-      case Entry(:final hash, kind: null):
-        // A subscription only sends entries of the kinds asked for.
-        throw RecordNoRestartChanges('the entry ${hash.hex} has no kind');
-      case Entry(:final hash, :final kind) when _eventKinds.contains(kind):
+      case Entry(:final id, :final kind) when _eventKinds.contains(kind):
         // Read whether or not it is decided, so a reading learns from the
         // events before the start entry too.
-        final event = RelayedEvent.read(hash, item.body);
+        final event = RelayedEvent.read(id, item.body);
         final reading = switch (event) {
           final event? => folds[event.source]?.step(event),
           null => null,
         };
-        if (start != null) waiting[hash] = reading;
-      case Entry(:final hash, :final kind) when kind == startKind:
+        if (start != null) waiting[id] = reading;
+      case Entry(:final id, :final kind) when kind == startKind:
         if (start != null) {
           throw RecordNoRestartChanges(
-            'a second start entry ${hash.hex}, after ${start.hex}',
+            'a second start entry ${id.hex}, after ${start.hex}',
           );
         }
-        start = hash;
-      case Entry(:final hash, kind: final kind?):
+        start = id;
+      case Entry(:final id, :final kind):
         if (start == null) {
           throw RecordNoRestartChanges(
-            'the decision ${hash.hex} is before any start',
+            'the decision ${id.hex} is before any start',
           );
         }
         final decision =
             decodeDecision(kind, item.body) ??
             (throw RecordNoRestartChanges(
-              'cannot read the decision ${hash.hex}',
+              'cannot read the decision ${id.hex}',
             ));
-        decided.take(hash, decision);
+        decided.take(id, decision);
         waiting.remove(decision.event);
       case CaughtUp():
         caughtUp = true;

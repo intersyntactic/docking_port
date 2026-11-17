@@ -6,7 +6,7 @@ import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook_client/is_logbook_client.dart' show ObjectId;
 import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy, MissionId;
 import 'package:test/test.dart';
 
@@ -26,7 +26,7 @@ final class _Mentions implements TurnRule {
       said.node.text.contains('@agent');
 }
 
-EntryHash _hash(String s) => EntryHash.of(utf8.encode(s));
+ObjectId _hash(String s) => ObjectId.of(utf8.encode(s));
 
 void main() {
   test('every duplicate names the first event with its key, not the copy '
@@ -43,7 +43,7 @@ void main() {
     );
     final decided = DecidedSoFar();
     final events = [for (final name in 'ABCD'.split('')) _hash(name)];
-    final ofs = <EntryHash>[];
+    final ofs = <ObjectId>[];
     for (final (i, event) in events.indexed) {
       final decision = decide(
         event,

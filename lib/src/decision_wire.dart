@@ -8,8 +8,7 @@ import 'dart:typed_data';
 import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
-import 'package:is_logbook/service.dart' show Kind;
+import 'package:is_logbook_client/is_logbook_client.dart' show Kind, ObjectId;
 import 'package:is_shapes/is_shapes.dart'
     show DecidedBy, MissionId, TrajectoryId;
 
@@ -98,7 +97,7 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
     return null;
   }
   if (json is! Map<String, Object?>) return null;
-  final event = _read(json['event'], EntryHash.parse);
+  final event = _read(json['event'], ObjectId.parse);
   final by = _read(json['by'], _decidedBy);
   if (event == null || by == null) return null;
   if (kind == DecisionEntryKind.eventAdmittedToMission) {
@@ -119,7 +118,7 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
 DecidedBy? _decidedBy(String name) => DecidedBy.values.asNameMap()[name];
 
 EventAdmittedToMission? _admitted(
-  EntryHash event,
+  ObjectId event,
   DecidedBy by,
   Map<String, Object?> json,
 ) {
@@ -196,7 +195,7 @@ MissionPlacement? _readMission(Map<String, Object?> json, Set<String> fields) {
 }
 
 EventNotAdmittedToMission? _notAdmitted(
-  EntryHash event,
+  ObjectId event,
   DecidedBy by,
   Map<String, Object?> json,
 ) {
@@ -216,7 +215,7 @@ EventNotAdmittedToMission? _notAdmitted(
   if (addressInExternalSystem == null || key == null) return null;
   switch (why) {
     case 'duplicate-event':
-      final of = _read(json['of'], EntryHash.parse);
+      final of = _read(json['of'], ObjectId.parse);
       if (of == null || json.length != 6) return null;
       return DuplicateEvent(
         event,

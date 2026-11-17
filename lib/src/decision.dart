@@ -28,8 +28,7 @@ library;
 import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
-import 'package:is_logbook/is_logbook.dart' show EntryHash;
-import 'package:is_logbook/service.dart' show Kind;
+import 'package:is_logbook_client/is_logbook_client.dart' show Kind, ObjectId;
 import 'package:is_shapes/is_shapes.dart'
     show ActorId, DecidedBy, MissionId, TrajectoryId;
 
@@ -127,7 +126,7 @@ sealed class AdmissionDecision {
   const AdmissionDecision(this.event, {required this.by});
 
   /// The event decided, by its entry's hash.
-  final EntryHash event;
+  final ObjectId event;
 
   /// Who decided it.
   final DecidedBy by;
@@ -306,7 +305,7 @@ final class DuplicateEvent extends NotAdmittedKeyedEvent {
     required this.of,
   });
 
-  final EntryHash of;
+  final ObjectId of;
 }
 
 /// [addressInExternalSystem]'s mission hasn't started, and the
