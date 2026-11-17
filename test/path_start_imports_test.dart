@@ -12,7 +12,7 @@ import 'package:test/test.dart';
 /// and what they import.
 const _allowed = {
   'is_docking_station',
-  'is_journal',
+  'is_logbook',
   'is_shapes',
   'is_content_id',
 };

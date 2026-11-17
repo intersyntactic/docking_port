@@ -1,5 +1,5 @@
 // What the docking station sends a record, and when: against a record kept in
-// memory the way the journal service keeps one.
+// memory the way the logbook service keeps one.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -8,7 +8,7 @@ import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
-import 'package:is_journal_client/is_journal_client.dart';
+import 'package:is_logbook_client/is_logbook_client.dart';
 import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy;
 import 'package:test/test.dart';
 
@@ -21,7 +21,7 @@ const _startKind = 'test-start';
 
 /// A record in memory: entries in order, a subscription that sends the
 /// backlog, then caught-up, then each new entry, and one chain of decisions
-/// whose tip a sent decision must name as previous, as the journal service
+/// whose tip a sent decision must name as previous, as the logbook service
 /// checks. It starts with its start entry, unless [started] is false.
 final class _Record {
   _Record({bool started = true}) {

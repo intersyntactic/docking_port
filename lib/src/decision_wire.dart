@@ -8,8 +8,8 @@ import 'dart:typed_data';
 import 'package:checked_json/checked_json.dart' show JsonObject;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId;
-import 'package:is_journal/is_journal.dart' show EntryHash;
-import 'package:is_journal/service.dart' show Kind;
+import 'package:is_logbook/is_logbook.dart' show EntryHash;
+import 'package:is_logbook/service.dart' show Kind;
 import 'package:is_shapes/is_shapes.dart'
     show DecidedBy, JourneyId, JourneyPathId;
 

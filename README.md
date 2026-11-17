@@ -104,7 +104,7 @@ What the docking station writes for each event, and the words in it:
 |---|---|
 | `event-admitted-to-mission` | The event comes in, on a trajectory or into a mission |
 | `event-not-admitted-to-mission` | It stays out; `why` says which case |
-| `mission-ended` | A mission is over, and the journal closes its chains |
+| `mission-ended` | A mission is over, and the logbook closes its chains |
 
 The start entry, `docking-station-set-up`, is written once at setup by
 infra's `record-setup` user, never by the docking station. A reading carries
@@ -135,10 +135,10 @@ uses the same one.
   decision (https://github.com/intersyntactic/docking_station/pull/5); reading
   the record and sending each decision
   (https://github.com/intersyntactic/docking_station/pull/6), now through
-  `is_journal_client`; the start entry
+  `is_logbook_client`; the start entry
   (https://github.com/intersyntactic/docking_station/pull/15); and
   `path_start.dart`, the airlock's narrow reader
   (https://github.com/intersyntactic/docking_station/pull/14).
 - **Not yet:** the service that runs it on a machine, with a real
-  `JournalReader` and `JournalWriter`.
+  `LogbookReader` and `LogbookWriter`.
 - **Coming:** handing admitted events to a trajectory's agent loop.

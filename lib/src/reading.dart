@@ -16,7 +16,7 @@ import 'package:is_annotation_shapes/is_annotation_shapes.dart'
     show VerdictOnShownMessage;
 import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid, WhatChanged;
-import 'package:is_journal/is_journal.dart' show EntryHash;
+import 'package:is_logbook/is_logbook.dart' show EntryHash;
 import 'package:is_shapes/is_shapes.dart' show ActorId;
 
 /// One event, as the docking station gives it to a reading: its entry's hash,
