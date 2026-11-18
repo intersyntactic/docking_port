@@ -16,12 +16,12 @@ import 'rules.dart';
 /// body is not what a relay records.
 ///
 /// In order: an event whose key was decided already is a [DuplicateEvent]. A
-/// change goes where the message it changes went, and a verdict under its
-/// address's trajectory. A join goes into its mission, and
-/// something said under its address's trajectory, marked with
-/// whether the turn rule says it starts a turn, or under a new one when it
-/// does. A mission not yet started is started only when [missions] takes
-/// it in.
+/// close closes its address's trajectory. A change goes where the message it
+/// changes went, and a verdict under its address's trajectory. A join goes
+/// into its mission, and something said under its address's trajectory,
+/// marked with whether the turn rule says it starts a turn, or under a new
+/// one when it does. A mission not yet started is started only when
+/// [missions] takes it in.
 ///
 /// Every decision it makes is [DecidedBy.rules]: nothing here asks the
 /// person.
@@ -33,16 +33,16 @@ AdmissionDecision decide(
   required TurnRule turns,
 }) {
   const by = DecidedBy.rules;
-  final AdmissibleEvent admissible;
+  final AddressedEvent addressed;
   switch (reading) {
     case null:
       return NoReadingForSource(event, by: by);
     case NothingToAdmit():
       return ReadingFoundNothing(event, by: by);
-    case AdmissibleEvent():
-      admissible = reading;
+    case AddressedEvent():
+      addressed = reading;
   }
-  final AdmissibleEvent(:addressInExternalSystem, :key) = admissible;
+  final AddressedEvent(:addressInExternalSystem, :key) = addressed;
   if (decided.decidedAt(addressInExternalSystem, key) case final first?) {
     return DuplicateEvent(
       event,
@@ -51,6 +51,28 @@ AdmissionDecision decide(
       key: key,
       of: first,
     );
+  }
+
+  final AdmissibleEvent admissible;
+  switch (addressed) {
+    case PersonAskedToCloseTrajectory():
+      return switch (decided.trajectoryOf(addressInExternalSystem)) {
+        final trajectory? => TrajectoryClosed(
+          event,
+          by: by,
+          reading: addressed,
+          trajectory: trajectory,
+          mission: decided.missionOfTrajectory(trajectory),
+        ),
+        null => CloseAskedAtAddressWithNoTrajectory(
+          event,
+          by: by,
+          addressInExternalSystem: addressInExternalSystem,
+          key: key,
+        ),
+      };
+    case AdmissibleEvent():
+      admissible = addressed;
   }
 
   EventAdmittedToMission admit(

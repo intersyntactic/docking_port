@@ -64,6 +64,12 @@ final class DecidedSoFar {
   /// [missionOf] has given, since every entry that starts one records them.
   JsonObject rulesOf(MissionId mission) => _rules[mission]!;
 
+  /// The mission [trajectory] was started in. Only for a trajectory that
+  /// [trajectoryOf] has given, since the entry that starts one names its
+  /// mission.
+  MissionId missionOfTrajectory(TrajectoryId trajectory) =>
+      _trajectoryMissions[trajectory]!;
+
   /// The trajectory the message [message] in [addressInExternalSystem] was
   /// admitted under: where a change to it goes. Null when it was never
   /// admitted.
@@ -94,26 +100,29 @@ final class DecidedSoFar {
       ):
         _events.putIfAbsent((addressInExternalSystem, key), () => event);
       case MissionEnded(:final mission):
-        _end(mission);
+        _forget({
+          for (final MapEntry(key: trajectory, value: of)
+              in _trajectoryMissions.entries)
+            if (of == mission) trajectory,
+        });
+      case TrajectoryClosed(:final reading, :final trajectory):
+        _events[(reading.addressInExternalSystem, reading.key)] =
+            decision.event;
+        _forget({trajectory});
       case NoReadingForSource() || ReadingFoundNothing():
         break;
     }
   }
 
-  /// Forgets [mission]'s trajectories, whose chains the record now closes, and
-  /// the messages admitted under them. An address in it then starts a
-  /// new trajectory, in the same mission, and a change to a message admitted
-  /// before the end is a change to one never admitted.
-  void _end(MissionId mission) {
-    final ended = {
-      for (final MapEntry(key: trajectory, value: of)
-          in _trajectoryMissions.entries)
-        if (of == mission) trajectory,
-    };
-    _trajectories.removeWhere((_, trajectory) => ended.contains(trajectory));
-    _messages.removeWhere((_, trajectory) => ended.contains(trajectory));
+  /// Forgets [closed], trajectories whose chains the record now closes, and
+  /// the messages admitted under them. Their addresses then start new
+  /// trajectories, in the same missions, and a change to a message admitted
+  /// before is a change to one never admitted.
+  void _forget(Set<TrajectoryId> closed) {
+    _trajectories.removeWhere((_, trajectory) => closed.contains(trajectory));
+    _messages.removeWhere((_, trajectory) => closed.contains(trajectory));
     _trajectoryMissions.removeWhere(
-      (trajectory, _) => ended.contains(trajectory),
+      (trajectory, _) => closed.contains(trajectory),
     );
   }
 

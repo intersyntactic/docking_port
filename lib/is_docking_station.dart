@@ -6,8 +6,9 @@
 ///
 /// So far: the reading contract, a module's [ModuleReading], a fold over its
 /// relay's [RelayedEvent]s that names what each one is, an [EventReading]. The
-/// [AdmissionDecision] recorded for each event, [EventAdmittedToMission] or
-/// [EventNotAdmittedToMission], and [MissionEnded], as [encodeDecision] writes
+/// [AdmissionDecision] recorded for each event, [EventAdmittedToMission],
+/// [EventNotAdmittedToMission] or [TrajectoryClosed], and [MissionEnded], as
+/// [encodeDecision] writes
 /// it and [decodeDecision] reads it back; [decide], which makes one under the
 /// rules passed in, [JourneyRule] and [TurnRule]; [DecidedSoFar], what the
 /// decisions add up to when read back; and [runDockingStation], which

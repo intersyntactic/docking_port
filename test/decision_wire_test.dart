@@ -68,6 +68,14 @@ final readings = <AdmissibleEvent>[
   ),
 ];
 
+final closeAsked = PersonAskedToCloseTrajectory(
+  addressInExternalSystem: addressInExternalSystem,
+  containingAddress: containingAddress,
+  from: from,
+  key: EventKey.parse('invoke:1')!,
+  message: message,
+);
+
 const rules = JsonObject.of({'tools': 'all'});
 
 EventAdmittedToMission _admitted(AdmittedPlacement placement, DecidedBy by) =>
@@ -127,6 +135,7 @@ void main() {
       'event-admitted-to-mission',
       'event-not-admitted-to-mission',
       'mission-ended',
+      'trajectory-closed',
     });
     String why(EventNotAdmittedToMission decision) =>
         (jsonDecode(_text(encodeDecision(decision))) as Map)['why'] as String;
@@ -138,6 +147,7 @@ void main() {
           AddressNotAdmittedToMission.new,
           SaidStartsNoTurn.new,
           JudgedMessageHasNoTrajectory.new,
+          CloseAskedAtAddressWithNoTrajectory.new,
         ])
           why(
             decline(
@@ -154,7 +164,12 @@ void main() {
         'address-not-admitted-to-mission',
         'said-starts-no-turn',
         'judged-message-has-no-trajectory',
+        'close-asked-at-address-with-no-trajectory',
       ],
+    );
+    expect(
+      encodeReading(closeAsked).string('case'),
+      'person-asked-to-close-trajectory',
     );
     expect([
       for (final reading in readings) encodeReading(reading).asUncheckedMap(),
@@ -203,6 +218,19 @@ void main() {
         ),
         _admitted(const IntoMission(StartsMission()), by),
         MissionEnded(event, by: by, mission: mission),
+        TrajectoryClosed(
+          event,
+          by: by,
+          reading: closeAsked,
+          trajectory: trajectory,
+          mission: mission,
+        ),
+        CloseAskedAtAddressWithNoTrajectory(
+          event,
+          by: by,
+          addressInExternalSystem: addressInExternalSystem,
+          key: key,
+        ),
         NoReadingForSource(event, by: by),
         ReadingFoundNothing(event, by: by),
         DuplicateEvent(
@@ -290,6 +318,14 @@ void main() {
     );
     final join = jsonDecode(utf8.decode(joinBody)) as Map<String, Object?>;
     expect(decodeDecision(joinKind, bytes(join)), isNotNull);
+    final closeReading = encodeReading(closeAsked).asUncheckedMap();
+    final closed = {
+      'event': _a,
+      'by': 'rules',
+      'reading': closeReading,
+      'trajectory': _c,
+      'mission': _b,
+    };
     final bad = <(Kind, Map<String, Object?>)>[
       // Something said must say whether it starts a turn, as a bool.
       (
@@ -434,7 +470,19 @@ void main() {
         Kind.parse('event')!,
         {'event': _a, 'by': 'rules', 'why': 'no-reading-for-source'},
       ),
+      // A close is never admitted, and only a close closes a trajectory.
+      (
+        DecisionEntryKind.eventAdmittedToMission,
+        {...good, 'reading': closeReading}..remove('startsTurn'),
+      ),
+      (DecisionEntryKind.trajectoryClosed, {...closed, 'reading': reading}),
+      (DecisionEntryKind.trajectoryClosed, {...closed}..remove('mission')),
+      (DecisionEntryKind.trajectoryClosed, {...closed, 'startsTurn': true}),
     ];
+    expect(
+      decodeDecision(DecisionEntryKind.trajectoryClosed, bytes(closed)),
+      isNotNull,
+    );
     for (final (kind, json) in bad) {
       expect(decodeDecision(kind, bytes(json)), isNull, reason: '$json');
     }

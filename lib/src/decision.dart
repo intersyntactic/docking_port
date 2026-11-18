@@ -36,7 +36,7 @@ import 'reading.dart';
 import 'rules.dart';
 
 /// The kinds of entry the docking station sends, one per event. Its user's
-/// row in the record's sender table allows these three and nothing else.
+/// row in the record's sender table allows these four and nothing else.
 abstract final class DecisionEntryKind {
   /// An [EventAdmittedToMission]'s kind.
   static final eventAdmittedToMission = Kind.parse(
@@ -52,12 +52,17 @@ abstract final class DecisionEntryKind {
   /// to close the mission's chains.
   static final missionEnded = Kind.missionEnded;
 
+  /// A [TrajectoryClosed]'s kind: the logbook's own, since the logbook reads
+  /// it to close the trajectory's chains.
+  static final trajectoryClosed = Kind.parse('trajectory-closed')!;
+
   /// Every kind above, as the docking station subscribes to its own
   /// decisions.
   static final all = {
     eventAdmittedToMission,
     eventNotAdmittedToMission,
     missionEnded,
+    trajectoryClosed,
   };
 }
 
@@ -250,6 +255,32 @@ final class MissionEnded extends AdmissionDecision {
   final MissionId mission;
 }
 
+/// [trajectory], in [mission], closed at [event], because a person asked
+/// ([reading]): its loop stops and its users are freed (loop_launcher), and
+/// the record takes nothing more on its chains (is_logbook). The next
+/// message at its address starts a new trajectory, in the same mission.
+///
+/// Anyone at the address may close it (Nick, 18 Nov), so it is decided
+/// [DecidedBy.rules], and [reading] says who asked.
+///
+/// The entry, of kind `trajectory-closed`:
+///
+///     {"event": <hex>, "by": <who>, "reading": <reading>,
+///      "trajectory": <id>, "mission": <id>}
+final class TrajectoryClosed extends AdmissionDecision {
+  const TrajectoryClosed(
+    super.event, {
+    required super.by,
+    required this.reading,
+    required this.trajectory,
+    required this.mission,
+  });
+
+  final PersonAskedToCloseTrajectory reading;
+  final TrajectoryId trajectory;
+  final MissionId mission;
+}
+
 /// [event] not admitted to any mission: nothing comes of it, and nothing
 /// will, whatever
 /// changes later. The case says why.
@@ -260,7 +291,8 @@ final class MissionEnded extends AdmissionDecision {
 ///
 /// `<case>` is `no-reading-for-source`, `reading-found-nothing`,
 /// `duplicate-event`, `address-not-admitted-to-mission`,
-/// `said-starts-no-turn`, `judged-message-has-no-trajectory` or
+/// `said-starts-no-turn`, `judged-message-has-no-trajectory`,
+/// `close-asked-at-address-with-no-trajectory` or
 /// `change-to-unadmitted-message`.
 sealed class EventNotAdmittedToMission extends AdmissionDecision {
   const EventNotAdmittedToMission(super.event, {required super.by});
@@ -343,8 +375,20 @@ final class JudgedMessageHasNoTrajectory extends NotAdmittedKeyedEvent {
   });
 }
 
+/// A close asked in [addressInExternalSystem], which is under no trajectory:
+/// none was started there, or the one there is closed already.
+final class CloseAskedAtAddressWithNoTrajectory extends NotAdmittedKeyedEvent {
+  const CloseAskedAtAddressWithNoTrajectory(
+    super.event, {
+    required super.by,
+    required super.addressInExternalSystem,
+    required super.key,
+  });
+}
+
 /// A change to [message], which was never admitted, or was admitted in a
-/// mission since ended, so there is no turn for it to change.
+/// mission since ended or a trajectory since closed, so there is no turn
+/// for it to change.
 /// `"message": <source>`.
 final class ChangeToUnadmittedMessage extends NotAdmittedKeyedEvent {
   const ChangeToUnadmittedMessage(
