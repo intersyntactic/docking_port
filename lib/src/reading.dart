@@ -276,15 +276,14 @@ final class ShownMessageJudged extends AdmissibleEvent {
 }
 
 /// [from] asked to close the trajectory [addressInExternalSystem] is under,
-/// picking it on [message], such as Teams' "Close trajectory" on a
-/// message's menu. Anyone at the address may ask, and nothing of it goes to
-/// the agent.
+/// on [message], such as the Close button on the card the agent posts when a
+/// trajectory starts. Anyone at the address may ask, and nothing of it goes
+/// to the agent.
 ///
 /// The trajectory is found by the address, not by [message], since the
-/// message picked is often one the agent sent, such as its reply or a card,
-/// and those were never admitted. [message] is kept to say where the person
-/// asked. A close always names who asked, since one asked by no one closes
-/// nothing.
+/// message asked on is one the agent sent, and those are never admitted.
+/// [message] is kept to say where the person asked. A close always names who
+/// asked, since one asked by no one closes nothing.
 final class PersonAskedToCloseTrajectory extends AddressedEvent {
   const PersonAskedToCloseTrajectory({
     required super.addressInExternalSystem,
