@@ -3,7 +3,7 @@ description: >-
   The docking station, a core piece of intersyntactic: it reads events from
   the record in order and decides whether each one is admitted to a
   mission, and on which trajectory.
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/intersyntactic/docking_station
 
 environment:

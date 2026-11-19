@@ -101,7 +101,8 @@ abstract interface class ModuleReading<S> {
 /// What one event is: something said ([MessageSaid]), a change to an
 /// earlier message ([MessageChanged]), an address joined
 /// ([ActorsJoinedAddress]), a person's verdict on something the agent showed
-/// ([ShownMessageJudged]), or nothing to admit ([NothingToAdmit]).
+/// ([ShownMessageJudged]), a person asking to close a trajectory
+/// ([PersonAskedToCloseTrajectory]), or nothing to admit ([NothingToAdmit]).
 sealed class EventReading {
   const EventReading();
 }
@@ -112,10 +113,12 @@ final class NothingToAdmit extends EventReading {
   const NothingToAdmit();
 }
 
-/// An event the docking station may admit, and what it needs to decide
-/// whether to.
-sealed class AdmissibleEvent extends EventReading {
-  const AdmissibleEvent({
+/// An event at an address, under a key: what the docking station decides
+/// once. Either an [AdmissibleEvent], which goes under a trajectory, or a
+/// [PersonAskedToCloseTrajectory], which closes one and is admitted under
+/// none.
+sealed class AddressedEvent extends EventReading {
+  const AddressedEvent({
     required this.addressInExternalSystem,
     required this.containingAddress,
     required this.key,
@@ -138,10 +141,20 @@ sealed class AdmissibleEvent extends EventReading {
   /// Who it comes from, or null for no one the module can name.
   ActorId? get from;
 
-  /// What "not admitted twice" compares, within [addressInExternalSystem]: the
+  /// What "not decided twice" compares, within [addressInExternalSystem]: the
   /// same for two events that record one thing, as a redelivery does, and
   /// different for two things, including two changes to one message.
   final EventKey key;
+}
+
+/// An event the docking station may admit, and what it needs to decide
+/// whether to.
+sealed class AdmissibleEvent extends AddressedEvent {
+  const AdmissibleEvent({
+    required super.addressInExternalSystem,
+    required super.containingAddress,
+    required super.key,
+  });
 }
 
 /// Something said, as [node], the node the trajectory's crux appends.
@@ -260,6 +273,31 @@ final class ShownMessageJudged extends AdmissibleEvent {
   final SourceMessageId to;
 
   final VerdictOnShownMessage verdict;
+}
+
+/// [from] asked to close the trajectory [addressInExternalSystem] is under,
+/// on [message], such as the Close button on the card the agent posts when a
+/// trajectory starts. Anyone at the address may ask, and nothing of it goes
+/// to the agent.
+///
+/// The trajectory is found by the address, not by [message], since the
+/// message asked on is one the agent sent, and those are never admitted.
+/// [message] is kept to say where the person asked. A close always names who
+/// asked, since one asked by no one closes nothing.
+final class PersonAskedToCloseTrajectory extends AddressedEvent {
+  const PersonAskedToCloseTrajectory({
+    required super.addressInExternalSystem,
+    required super.containingAddress,
+    required this.from,
+    required super.key,
+    required this.message,
+  });
+
+  @override
+  final ActorId from;
+
+  /// The message the person picked the close on, as it was sent.
+  final SourceMessageId message;
 }
 
 /// An address in an external system: a Teams chat, channel or channel thread, a

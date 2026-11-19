@@ -7,7 +7,8 @@ import 'package:is_conversation_shapes/is_conversation_shapes.dart'
     show SourceMessageId, UserSaid;
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_logbook_client/is_logbook_client.dart' show ObjectId;
-import 'package:is_shapes/is_shapes.dart' show ActorId, DecidedBy, MissionId;
+import 'package:is_shapes/is_shapes.dart'
+    show ActorId, DecidedBy, MissionId, TrajectoryId;
 import 'package:test/test.dart';
 
 final class _All implements JourneyRule, TurnRule {
@@ -213,6 +214,82 @@ void main() {
     );
     expect(again.rules?.asUncheckedMap(), first.rules?.asUncheckedMap());
     expect(rule.asked, 1);
+  });
+
+  test('a close closes only its thread\'s trajectory; the thread\'s next '
+      'message starts a new one in the same mission', () {
+    final channel = AddressInExternalSystem.parse('test:channel')!;
+    AddressInExternalSystem thread(String t) =>
+        AddressInExternalSystem.parse('test:channel;$t')!;
+    final decided = DecidedSoFar();
+    AdmissionDecision step(String key, AddressedEvent reading) {
+      final decision = decide(
+        _hash(key),
+        reading,
+        decided,
+        missions: _All(),
+        turns: _All(),
+      );
+      decided.take(_hash('decision $key'), decision);
+      return decision;
+    }
+
+    AdmissionDecision say(String t, String key) => step(
+      key,
+      MessageSaid(
+        addressInExternalSystem: thread(t),
+        containingAddress: channel,
+        key: EventKey.parse(key)!,
+        node: UserSaid(
+          author: ActorId.parse('teams:t/p')!,
+          source: SourceMessageId.parse('$t|$key')!,
+          text: 'hi',
+        ),
+      ),
+    );
+    AdmissionDecision close(String t, String key) => step(
+      key,
+      PersonAskedToCloseTrajectory(
+        addressInExternalSystem: thread(t),
+        containingAddress: channel,
+        from: ActorId.parse('teams:t/q')!,
+        key: EventKey.parse(key)!,
+        message: SourceMessageId.parse('$t|card')!,
+      ),
+    );
+    TrajectoryId started(String key) =>
+        TrajectoryId.parse(_hash('decision $key').hex)!;
+
+    say('t1', 'a');
+    final mission = MissionId.parse(_hash('decision a').hex)!;
+    say('t2', 'b');
+
+    expect(
+      close('t1', 'c'),
+      isA<TrajectoryClosed>()
+          .having((c) => c.trajectory, 'trajectory', started('a'))
+          .having((c) => c.mission, 'mission', mission)
+          .having((c) => c.reading.from.value, 'who asked', 'teams:t/q'),
+    );
+    expect(
+      (say('t2', 'd') as EventAdmittedToMission).placement,
+      isA<OnTrajectory>().having((p) => p.trajectory, 'the same', started('b')),
+    );
+    expect(
+      close('t1', 'e'),
+      isA<CloseAskedAtAddressWithNoTrajectory>(),
+      reason: 'closed already',
+    );
+    expect(close('t1', 'c'), isA<DuplicateEvent>());
+    expect(
+      (say('t1', 'f') as EventAdmittedToMission).placement,
+      isA<StartsTrajectory>().having(
+        (p) => p.mission,
+        'mission',
+        isA<InMission>().having((m) => m.mission, 'mission', mission),
+      ),
+    );
+    expect(close('t3', 'g'), isA<CloseAskedAtAddressWithNoTrajectory>());
   });
 }
 

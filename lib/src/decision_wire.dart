@@ -40,6 +40,11 @@ import 'reading_wire.dart';
       }
     case MissionEnded(:final mission):
       json['mission'] = mission.hex;
+    case TrajectoryClosed(:final reading, :final trajectory, :final mission):
+      json
+        ..['reading'] = encodeReading(reading)
+        ..['trajectory'] = trajectory.hex
+        ..['mission'] = mission.hex;
     case EventNotAdmittedToMission():
       json['why'] = _why(decision);
       if (decision case NotAdmittedKeyedEvent(
@@ -63,6 +68,7 @@ import 'reading_wire.dart';
     EventAdmittedToMission() => DecisionEntryKind.eventAdmittedToMission,
     EventNotAdmittedToMission() => DecisionEntryKind.eventNotAdmittedToMission,
     MissionEnded() => DecisionEntryKind.missionEnded,
+    TrajectoryClosed() => DecisionEntryKind.trajectoryClosed,
   };
   return (kind, Uint8List.fromList(utf8.encode(jsonEncode(json))));
 }
@@ -83,6 +89,8 @@ String _why(EventNotAdmittedToMission declined) => switch (declined) {
   AddressNotAdmittedToMission() => 'address-not-admitted-to-mission',
   SaidStartsNoTurn() => 'said-starts-no-turn',
   JudgedMessageHasNoTrajectory() => 'judged-message-has-no-trajectory',
+  CloseAskedAtAddressWithNoTrajectory() =>
+    'close-asked-at-address-with-no-trajectory',
   ChangeToUnadmittedMessage() => 'change-to-unadmitted-message',
 };
 
@@ -111,7 +119,46 @@ AdmissionDecision? decodeDecision(Kind kind, Uint8List body) {
     if (mission == null || json.length != 3) return null;
     return MissionEnded(event, by: by, mission: mission);
   }
+  if (kind == DecisionEntryKind.trajectoryClosed) {
+    return _closed(event, by, json);
+  }
   return null;
+}
+
+TrajectoryClosed? _closed(
+  ObjectId event,
+  DecidedBy by,
+  Map<String, Object?> json,
+) {
+  final reading = _reading(json);
+  final trajectory = _read(json['trajectory'], TrajectoryId.parse);
+  final mission = _read(json['mission'], MissionId.parse);
+  if (reading is! PersonAskedToCloseTrajectory ||
+      trajectory == null ||
+      mission == null ||
+      json.length != 5) {
+    return null;
+  }
+  return TrajectoryClosed(
+    event,
+    by: by,
+    reading: reading,
+    trajectory: trajectory,
+    mission: mission,
+  );
+}
+
+/// The `reading` field read back; null when it isn't one [encodeReading]
+/// writes.
+AddressedEvent? _reading(Map<String, Object?> json) {
+  try {
+    return decodeReading(
+      JsonObject.parse(json['reading']) ??
+          (throw const FormatException('`reading` is not an object')),
+    );
+  } on FormatException {
+    return null;
+  }
 }
 
 /// The [DecidedBy] named [name]; null for any other name.
@@ -123,12 +170,9 @@ EventAdmittedToMission? _admitted(
   Map<String, Object?> json,
 ) {
   final AdmissibleEvent reading;
-  try {
-    reading = decodeReading(
-      JsonObject.parse(json['reading']) ??
-          (throw const FormatException('`reading` is not an object')),
-    );
-  } on FormatException {
+  if (_reading(json) case final AdmissibleEvent admissible) {
+    reading = admissible;
+  } else {
     return null;
   }
   final fields = {'event', 'by', 'reading'};
@@ -236,7 +280,8 @@ EventNotAdmittedToMission? _notAdmitted(
       );
     case 'address-not-admitted-to-mission' ||
         'said-starts-no-turn' ||
-        'judged-message-has-no-trajectory':
+        'judged-message-has-no-trajectory' ||
+        'close-asked-at-address-with-no-trajectory':
       if (json.length != 5) return null;
       return switch (why) {
         'address-not-admitted-to-mission' => AddressNotAdmittedToMission(
@@ -251,7 +296,13 @@ EventNotAdmittedToMission? _notAdmitted(
           addressInExternalSystem: addressInExternalSystem,
           key: key,
         ),
-        _ => JudgedMessageHasNoTrajectory(
+        'judged-message-has-no-trajectory' => JudgedMessageHasNoTrajectory(
+          event,
+          by: by,
+          addressInExternalSystem: addressInExternalSystem,
+          key: key,
+        ),
+        _ => CloseAskedAtAddressWithNoTrajectory(
           event,
           by: by,
           addressInExternalSystem: addressInExternalSystem,

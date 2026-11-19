@@ -35,8 +35,9 @@ const readingNodeShapes = <String, Set<String>>{
 /// [UserSaid]; `message-changed`, with `"from"?`, `"message"` and
 /// `"change"`, a [WhatChanged]; `actors-joined-address`, with `"from"?` and
 /// `"joiners"`; `shown-message-judged`, with `"from"`, `"to"` and
-/// `"verdict"`, a [VerdictOnShownMessage].
-JsonObject encodeReading(AdmissibleEvent reading) => JsonObject.of({
+/// `"verdict"`, a [VerdictOnShownMessage]; `person-asked-to-close-trajectory`,
+/// with `"from"` and `"message"`.
+JsonObject encodeReading(AddressedEvent reading) => JsonObject.of({
   'case': _case(reading),
   'addressInExternalSystem': reading.addressInExternalSystem.value,
   'containingAddress': ?reading.containingAddress?.value,
@@ -57,20 +58,25 @@ JsonObject encodeReading(AdmissibleEvent reading) => JsonObject.of({
       'to': to.value,
       'verdict': verdict.toJson(),
     },
+    PersonAskedToCloseTrajectory(:final from, :final message) => {
+      'from': from.value,
+      'message': message.value,
+    },
   },
 });
 
-String _case(AdmissibleEvent reading) => switch (reading) {
+String _case(AddressedEvent reading) => switch (reading) {
   MessageSaid() => 'message-said',
   MessageChanged() => 'message-changed',
   ActorsJoinedAddress() => 'actors-joined-address',
   ShownMessageJudged() => 'shown-message-judged',
+  PersonAskedToCloseTrajectory() => 'person-asked-to-close-trajectory',
 };
 
 /// [json] read back as the reading [encodeReading] wrote. A
 /// [FormatException] for anything it doesn't write: an unknown case, a
 /// field missing, extra or malformed, a node its package won't read.
-AdmissibleEvent decodeReading(JsonObject json) {
+AddressedEvent decodeReading(JsonObject json) {
   final addressInExternalSystem = _parse(
     json,
     'addressInExternalSystem',
@@ -129,6 +135,16 @@ AdmissibleEvent decodeReading(JsonObject json) {
         verdict: VerdictOnShownMessage.fromJson(json.object('verdict')),
       ),
       const {'from', 'to', 'verdict'},
+    ),
+    'person-asked-to-close-trajectory' => (
+      PersonAskedToCloseTrajectory(
+        addressInExternalSystem: addressInExternalSystem,
+        containingAddress: containingAddress,
+        from: _parse(json, 'from', ActorId.parse),
+        key: key,
+        message: _parse(json, 'message', SourceMessageId.parse),
+      ),
+      const {'from', 'message'},
     ),
     final other => throw FormatException('`case` is not a reading: $other'),
   };
