@@ -1,11 +1,12 @@
 /// The rules the docking station runs under as a service, for now: a list of
-/// the addresses in external systems let in, what may leave this machine for
-/// every mission they start, and every message said starting a turn.
+/// the addresses in external systems let in, the flight rules each mission
+/// they start is admitted under, and every message said starting a turn.
 ///
 /// The list and the turn rule stand in for calls still open (Nick, 15 Nov:
 /// for Wednesday a new chat or channel comes in by a rule, not by his yes),
-/// so they stay here, beside the program, and not in the library. What may
-/// leave this machine is the bot's own file (Nick, 17 Nov: one file per bot).
+/// so they stay here, beside the program, and not in the library. Which
+/// flight rules a mission gets is chosen by the address it is: a channel or
+/// a chat (Nick, 20 Nov).
 library;
 
 import 'dart:convert';
@@ -15,10 +16,10 @@ import 'package:checked_json/checked_json.dart'
 import 'package:is_docking_station/is_docking_station.dart';
 import 'package:is_flight_rules/is_flight_rules.dart';
 
-/// The addresses in external systems whose missions come in, each under
-/// [whatMayLeaveThisMachine], the bot's rules. A channel on the list lets in
-/// each of its threads, as the mission they sit in; a chat on the list lets
-/// itself in. Anything else is not taken in.
+/// The addresses in external systems whose missions come in, each under the
+/// flight rules [flightRules] gives its address. A channel on the list lets
+/// in each of its threads, as the mission they sit in; a chat on the list
+/// lets itself in. Anything else is not taken in.
 ///
 /// The list is read from the service's config file, a JSON object:
 ///
@@ -28,15 +29,19 @@ import 'package:is_flight_rules/is_flight_rules.dart';
 /// named twice, or an empty list refuses the whole file, since a service
 /// that started with half a list would turn away missions nobody meant to.
 final class AddressesLetIn implements JourneyRule {
-  AddressesLetIn._(this.addresses, this.whatMayLeaveThisMachine)
-    : _rules = whatMayLeaveThisMachine.toJson();
+  AddressesLetIn._(this.addresses, this.flightRules)
+    : _rulesByAddress = {
+        for (final address in addresses)
+          address: flightRules.forMission(address).toJson(),
+      };
 
-  /// The list in [config], the config file's contents, under
-  /// [whatMayLeaveThisMachine]. Throws a [FormatException] naming what is
-  /// wrong.
+  /// The list in [config], the config file's contents, with [flightRules]
+  /// for the missions it lets in. Throws a [FormatException] naming what is
+  /// wrong, including flight rules given for an address not on the list,
+  /// which no mission could ever start under.
   factory AddressesLetIn.parse(
     String config, {
-    required WhatMayLeaveThisMachine whatMayLeaveThisMachine,
+    required FlightRulesByMissionAddress flightRules,
   }) {
     final json = _object(config, 'the config');
     _onlyKeys(json, const {'addressesLetIn'}, 'the config');
@@ -56,34 +61,85 @@ final class AddressesLetIn implements JourneyRule {
     if (addresses.isEmpty) {
       throw const FormatException('addressesLetIn names no address');
     }
-    return AddressesLetIn._(
-      Set.unmodifiable(addresses),
-      whatMayLeaveThisMachine,
-    );
+    for (final address in flightRules.byMissionAddress.keys) {
+      if (!addresses.contains(address)) {
+        throw FormatException(
+          'the rules file gives flight rules for $address, which '
+          'addressesLetIn does not let in',
+        );
+      }
+    }
+    return AddressesLetIn._(Set.unmodifiable(addresses), flightRules);
   }
 
   /// The addresses on the list.
   final Set<AddressInExternalSystem> addresses;
 
-  /// What may leave this machine for every mission the list takes in.
-  final WhatMayLeaveThisMachine whatMayLeaveThisMachine;
+  /// The flight rules each mission the list takes in is admitted under.
+  final FlightRulesByMissionAddress flightRules;
 
-  final JsonObject _rules;
+  final Map<AddressInExternalSystem, JsonObject> _rulesByAddress;
 
   @override
   JsonObject? takeIn(AdmissibleEvent first) =>
-      addresses.contains(
-        first.containingAddress ?? first.addressInExternalSystem,
-      )
-      ? _rules
-      : null;
+      _rulesByAddress[first.containingAddress ?? first.addressInExternalSystem];
 }
 
-/// The bot's rules file, [text], read strictly: an unknown key at any level
-/// throws a [FormatException] naming the part, so a typo stops the service
-/// before any mission starts under it.
-WhatMayLeaveThisMachine readWhatMayLeaveThisMachine(String text) =>
-    WhatMayLeaveThisMachine.fromJson(_object(text, 'the rules file'));
+/// The rules file: the flight rules a mission is admitted under, by the
+/// address it is, and the ones every other mission gets.
+///
+///     {"default": <flight rules>,
+///      "byMissionAddress": [{"address": "teams:...", "rules": <flight rules>}]}
+///
+/// `<flight rules>` is what [FlightRules.fromJson] reads. Read strictly: an
+/// unknown key at any level, a missing default, or an address that isn't one
+/// or is named twice throws a [FormatException] naming the part, so a typo
+/// stops the service before any mission starts under it.
+final class FlightRulesByMissionAddress {
+  FlightRulesByMissionAddress._(this.defaultRules, this.byMissionAddress);
+
+  /// The rules file's contents, [text], read strictly.
+  factory FlightRulesByMissionAddress.parse(String text) {
+    final json = _object(text, 'the rules file');
+    _onlyKeys(json, const {'default', 'byMissionAddress'}, 'the rules file');
+    final defaultRules = FlightRules.fromJson(
+      json.object('default'),
+      'default',
+    );
+    final byMissionAddress = <AddressInExternalSystem, FlightRules>{};
+    for (final (i, entry) in json.objects('byMissionAddress').indexed) {
+      final field = 'byMissionAddress[$i]';
+      _onlyKeys(entry, const {'address', 'rules'}, field);
+      final address =
+          AddressInExternalSystem.parse(entry.string('address')) ??
+          (throw JsonFieldException(
+            '$field.address',
+            'an address: a system, a colon and its id',
+          ));
+      if (byMissionAddress.containsKey(address)) {
+        throw FormatException('$address is given flight rules twice');
+      }
+      byMissionAddress[address] = FlightRules.fromJson(
+        entry.object('rules'),
+        '$field.rules',
+      );
+    }
+    return FlightRulesByMissionAddress._(
+      defaultRules,
+      Map.unmodifiable(byMissionAddress),
+    );
+  }
+
+  /// The flight rules for a mission the file names no address for.
+  final FlightRules defaultRules;
+
+  /// The flight rules for each mission address the file names.
+  final Map<AddressInExternalSystem, FlightRules> byMissionAddress;
+
+  /// The flight rules the mission [address] is admitted under.
+  FlightRules forMission(AddressInExternalSystem address) =>
+      byMissionAddress[address] ?? defaultRules;
+}
 
 /// Every message said starts a turn: Teams is taken to deliver only what
 /// @mentions the agent, so each one is asked of it. Whether Teams does is
@@ -100,7 +156,7 @@ JsonObject _object(String text, String what) =>
     (throw FormatException('$what is not a JSON object'));
 
 void _onlyKeys(JsonObject json, Set<String> allowed, String what) {
-  for (final key in json.asUncheckedMap().keys) {
+  for (final key in json.keys) {
     if (!allowed.contains(key)) {
       throw FormatException('$what has a key it does not take: $key');
     }

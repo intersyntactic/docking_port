@@ -183,23 +183,24 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.2.0"
   is_effects:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: is_effects
-      sha256: "3ab745e8d01af33d9db6934d39d9ed6d69c1da089ed5d6c465e938a26e63234d"
+      sha256: bb3936fec38b2adc0aa4df95a822c444183528a44d85f2501bc019ffb8cf7d43
       url: "https://pub.dev"
     source: hosted
-    version: "0.8.0"
+    version: "0.11.0"
   is_flight_rules:
     dependency: "direct main"
     description:
-      name: is_flight_rules
-      sha256: "2ef0e91cd63c4b339674c5c09af6f7b6e883926c9bf9a7a1b43d68531236c513"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.1"
+      path: "."
+      ref: "0eca3c35f19d2be54d52b003f0b3808aaa73d376"
+      resolved-ref: "0eca3c35f19d2be54d52b003f0b3808aaa73d376"
+      url: "https://github.com/intersyntactic/flight_rules.git"
+    source: git
+    version: "0.2.0"
   is_logbook:
     dependency: transitive
     description:

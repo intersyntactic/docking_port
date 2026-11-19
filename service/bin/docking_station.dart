@@ -8,9 +8,10 @@
 ///     --write-socket=PATH                  the logbook's write socket
 ///     --config=/etc/.../config.json        the addresses let in, as
 ///                                          [AddressesLetIn] reads them
-///     --what-may-leave-this-machine=/etc/.../hart.json
-///                                          the bot's rules file, read as
-///                                          [WhatMayLeaveThisMachine]
+///     --flight-rules=/etc/.../flight-rules.json
+///                                          the flight rules each mission
+///                                          starts under, read as
+///                                          [FlightRulesByMissionAddress]
 ///     --start-kind=KIND                    the kind of the start entry,
 ///                                          written once at setup
 ///
@@ -34,7 +35,7 @@ const _options = {
   'read-socket',
   'write-socket',
   'config',
-  'what-may-leave-this-machine',
+  'flight-rules',
   'start-kind',
 };
 
@@ -56,18 +57,15 @@ Future<void> main(List<String> arguments) async {
   final startKind =
       Kind.parse(given['start-kind']!) ??
       _abort('--start-kind "${given['start-kind']}" is not a kind', 64);
-  final whatMayLeaveThisMachine = await _read(
-    given['what-may-leave-this-machine']!,
+  final flightRules = await _read(
+    given['flight-rules']!,
     'the rules file',
-    readWhatMayLeaveThisMachine,
+    FlightRulesByMissionAddress.parse,
   );
   final addressesLetIn = await _read(
     given['config']!,
     'the config',
-    (text) => AddressesLetIn.parse(
-      text,
-      whatMayLeaveThisMachine: whatMayLeaveThisMachine,
-    ),
+    (text) => AddressesLetIn.parse(text, flightRules: flightRules),
   );
 
   final reader = LogbookReader(given['read-socket']!);
