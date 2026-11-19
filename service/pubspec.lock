@@ -185,7 +185,7 @@ packages:
     source: path
     version: "0.2.0"
   is_effects:
-    dependency: "direct overridden"
+    dependency: transitive
     description:
       name: is_effects
       sha256: bb3936fec38b2adc0aa4df95a822c444183528a44d85f2501bc019ffb8cf7d43
@@ -196,8 +196,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "0eca3c35f19d2be54d52b003f0b3808aaa73d376"
-      resolved-ref: "0eca3c35f19d2be54d52b003f0b3808aaa73d376"
+      ref: "77fde4da8045854529826038537dea35cab29190"
+      resolved-ref: "77fde4da8045854529826038537dea35cab29190"
       url: "https://github.com/intersyntactic/flight_rules.git"
     source: git
     version: "0.2.0"
@@ -237,8 +237,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: c2bd93ee76afb033bc0c2d6607b3acf79b93134a
-      resolved-ref: c2bd93ee76afb033bc0c2d6607b3acf79b93134a
+      ref: "9a3bf6877343e558c6b03871bcb0431f2604cdd5"
+      resolved-ref: "9a3bf6877343e558c6b03871bcb0431f2604cdd5"
       url: "https://github.com/intersyntactic/teams_module.git"
     source: git
     version: "0.0.1"

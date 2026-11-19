@@ -16,12 +16,12 @@ dependencies:
   is_flight_rules:
     git:
       url: https://github.com/intersyntactic/flight_rules.git
-      ref: 0eca3c35f19d2be54d52b003f0b3808aaa73d376
+      ref: 77fde4da8045854529826038537dea35cab29190
   is_logbook_client: ^0.2.0
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
-      ref: c2bd93ee76afb033bc0c2d6607b3acf79b93134a
+      ref: 9a3bf6877343e558c6b03871bcb0431f2604cdd5
 
 dependency_overrides:
   # is_teams_module takes is_docking_station from pub.dev; pub won't mix a
@@ -29,7 +29,6 @@ dependency_overrides:
   # this package wins.
   is_docking_station:
     path: ..
-  is_effects: ^0.11.0
 
 dev_dependencies:
   is_conversation_shapes: ^0.8.3
