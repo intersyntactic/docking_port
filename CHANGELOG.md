@@ -1,3 +1,12 @@
+## 0.3.0
+
+- Every reading names the bot the event was sent to, `addressedTo`, an
+  `ActorId` the external system verified (such as the audience of the token
+  Teams signed it with), or null when the module can't verify one. On the
+  wire it is `"addressedTo"` in the reading, left out when null. A reader on
+  0.2.0 refuses a reading that has it, so move every reader to 0.3.0 before
+  deploying a module that fills it.
+
 ## 0.2.0
 
 - A person can close a trajectory. The reading `PersonAskedToCloseTrajectory`

@@ -178,6 +178,7 @@ final class _Reading implements ModuleReading<int> {
         MessageSaid(
           addressInExternalSystem: chat,
           containingAddress: null,
+          addressedTo: null,
           key: EventKey.parse(key)!,
           node: UserSaid(
             author: ann,
@@ -231,6 +232,7 @@ EventAdmittedToMission _startsChat(ObjectId event, String key) =>
       reading: MessageSaid(
         addressInExternalSystem: chat,
         containingAddress: null,
+        addressedTo: null,
         key: EventKey.parse(key)!,
         node: UserSaid(
           author: ann,

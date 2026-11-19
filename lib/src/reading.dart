@@ -121,6 +121,7 @@ sealed class AddressedEvent extends EventReading {
   const AddressedEvent({
     required this.addressInExternalSystem,
     required this.containingAddress,
+    required this.addressedTo,
     required this.key,
   });
 
@@ -138,6 +139,12 @@ sealed class AddressedEvent extends EventReading {
   /// the docking station never reads a module's ids to find it.
   final AddressInExternalSystem? containingAddress;
 
+  /// The bot the event was sent to, as the external system verified it, such
+  /// as the audience of the token Teams signed it with. Null when the module
+  /// can't verify who it was sent to. A fact of the event, not which pool or
+  /// sign-in the bot is: those belong to whoever keeps the pools.
+  final ActorId? addressedTo;
+
   /// Who it comes from, or null for no one the module can name.
   ActorId? get from;
 
@@ -153,6 +160,7 @@ sealed class AdmissibleEvent extends AddressedEvent {
   const AdmissibleEvent({
     required super.addressInExternalSystem,
     required super.containingAddress,
+    required super.addressedTo,
     required super.key,
   });
 }
@@ -169,6 +177,7 @@ final class MessageSaid extends AdmissibleEvent {
   const MessageSaid({
     required super.addressInExternalSystem,
     required super.containingAddress,
+    required super.addressedTo,
     required super.key,
     required this.node,
   });
@@ -193,6 +202,7 @@ final class MessageChanged extends AdmissibleEvent {
   const MessageChanged({
     required super.addressInExternalSystem,
     required super.containingAddress,
+    required super.addressedTo,
     required this.from,
     required super.key,
     required this.message,
@@ -215,6 +225,7 @@ final class ActorsJoinedAddress extends AdmissibleEvent {
   const ActorsJoinedAddress._({
     required super.addressInExternalSystem,
     required super.containingAddress,
+    required super.addressedTo,
     required this.from,
     required super.key,
     required this.joiners,
@@ -231,6 +242,7 @@ final class ActorsJoinedAddress extends AdmissibleEvent {
   static ActorsJoinedAddress? of({
     required AddressInExternalSystem addressInExternalSystem,
     required AddressInExternalSystem? containingAddress,
+    required ActorId? addressedTo,
     required ActorId? from,
     required EventKey key,
     required Iterable<ActorId> joiners,
@@ -240,6 +252,7 @@ final class ActorsJoinedAddress extends AdmissibleEvent {
     return ActorsJoinedAddress._(
       addressInExternalSystem: addressInExternalSystem,
       containingAddress: containingAddress,
+      addressedTo: addressedTo,
       from: from,
       key: key,
       joiners: list,
@@ -260,6 +273,7 @@ final class ShownMessageJudged extends AdmissibleEvent {
   const ShownMessageJudged({
     required super.addressInExternalSystem,
     required super.containingAddress,
+    required super.addressedTo,
     required this.from,
     required super.key,
     required this.to,
@@ -288,6 +302,7 @@ final class PersonAskedToCloseTrajectory extends AddressedEvent {
   const PersonAskedToCloseTrajectory({
     required super.addressInExternalSystem,
     required super.containingAddress,
+    required super.addressedTo,
     required this.from,
     required super.key,
     required this.message,
