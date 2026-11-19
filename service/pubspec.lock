@@ -195,11 +195,10 @@ packages:
   is_flight_rules:
     dependency: "direct main"
     description:
-      path: "."
-      ref: "77fde4da8045854529826038537dea35cab29190"
-      resolved-ref: "77fde4da8045854529826038537dea35cab29190"
-      url: "https://github.com/intersyntactic/flight_rules.git"
-    source: git
+      name: is_flight_rules
+      sha256: "5a0a7b582ca8d2b0b9aeee381892c9e1000d3f94163b0cab20507b56bbd79afc"
+      url: "https://pub.dev"
+    source: hosted
     version: "0.2.0"
   is_logbook:
     dependency: transitive

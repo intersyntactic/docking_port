@@ -13,10 +13,7 @@ dependencies:
   checked_json: ^0.2.1
   is_docking_station:
     path: ..
-  is_flight_rules:
-    git:
-      url: https://github.com/intersyntactic/flight_rules.git
-      ref: 77fde4da8045854529826038537dea35cab29190
+  is_flight_rules: ^0.2.0
   is_logbook_client: ^0.2.0
   is_teams_module:
     git:
