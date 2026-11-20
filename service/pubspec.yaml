@@ -18,7 +18,7 @@ dependencies:
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
-      ref: 08b5ffe73356ea565fcea1f94d7b1e12d52ff099
+      ref: 9e4c16dd24767cda7414aeb9c1e9b902f2f6c4bd
 
 dependency_overrides:
   # is_teams_module takes is_docking_station from pub.dev; pub won't mix a
