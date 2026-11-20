@@ -13,12 +13,12 @@ dependencies:
   checked_json: ^0.2.1
   is_docking_station:
     path: ..
-  is_flight_rules: ^0.2.0
+  is_flight_rules: ^0.3.0
   is_logbook_client: ^0.2.0
   is_teams_module:
     git:
       url: https://github.com/intersyntactic/teams_module.git
-      ref: 9a3bf6877343e558c6b03871bcb0431f2604cdd5
+      ref: 08b5ffe73356ea565fcea1f94d7b1e12d52ff099
 
 dependency_overrides:
   # is_teams_module takes is_docking_station from pub.dev; pub won't mix a

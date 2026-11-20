@@ -183,23 +183,23 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0"
   is_effects:
     dependency: transitive
     description:
       name: is_effects
-      sha256: bb3936fec38b2adc0aa4df95a822c444183528a44d85f2501bc019ffb8cf7d43
+      sha256: a9bedb77f620bc711fa81a817c7fbfce0028c567a87cfbc63a2a023d9acd74bd
       url: "https://pub.dev"
     source: hosted
-    version: "0.11.0"
+    version: "0.12.0"
   is_flight_rules:
     dependency: "direct main"
     description:
       name: is_flight_rules
-      sha256: "5a0a7b582ca8d2b0b9aeee381892c9e1000d3f94163b0cab20507b56bbd79afc"
+      sha256: ee717fe2c470fc6ec50649352988c76e5a564dffca2964218a8c9ee4a1922a06
       url: "https://pub.dev"
     source: hosted
-    version: "0.2.0"
+    version: "0.3.0"
   is_logbook:
     dependency: transitive
     description:
@@ -236,8 +236,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "9a3bf6877343e558c6b03871bcb0431f2604cdd5"
-      resolved-ref: "9a3bf6877343e558c6b03871bcb0431f2604cdd5"
+      ref: "08b5ffe73356ea565fcea1f94d7b1e12d52ff099"
+      resolved-ref: "08b5ffe73356ea565fcea1f94d7b1e12d52ff099"
       url: "https://github.com/intersyntactic/teams_module.git"
     source: git
     version: "0.0.1"
