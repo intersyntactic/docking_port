@@ -59,6 +59,7 @@ MessageSaid _said(String address, {String? containing}) => MessageSaid(
   containingAddress: containing == null
       ? null
       : AddressInExternalSystem.parse(containing)!,
+  addressedTo: null,
   key: EventKey.parse('message:1')!,
   node: UserSaid(
     author: ActorId.parse('teams:t/p')!,

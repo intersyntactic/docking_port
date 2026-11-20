@@ -35,6 +35,7 @@ void main() {
     final said = MessageSaid(
       addressInExternalSystem: AddressInExternalSystem.parse('test:chat')!,
       containingAddress: null,
+      addressedTo: null,
       key: EventKey.parse('message:1')!,
       node: UserSaid(
         author: ActorId.parse('teams:t/p')!,
@@ -71,6 +72,7 @@ void main() {
         MessageSaid(
           addressInExternalSystem: chat,
           containingAddress: null,
+          addressedTo: null,
           key: EventKey.parse(key)!,
           node: UserSaid(
             author: ActorId.parse('teams:t/p')!,
@@ -111,6 +113,7 @@ void main() {
         'test:channel;$thread',
       )!,
       containingAddress: channel,
+      addressedTo: null,
       key: EventKey.parse(key)!,
       node: UserSaid(
         author: ActorId.parse('teams:t/p')!,
@@ -164,6 +167,7 @@ void main() {
         'test:channel;t1',
       )!,
       containingAddress: channel,
+      addressedTo: null,
       key: EventKey.parse(key)!,
       node: UserSaid(
         author: ActorId.parse('teams:t/p')!,
@@ -239,6 +243,7 @@ void main() {
       MessageSaid(
         addressInExternalSystem: thread(t),
         containingAddress: channel,
+        addressedTo: null,
         key: EventKey.parse(key)!,
         node: UserSaid(
           author: ActorId.parse('teams:t/p')!,
@@ -252,6 +257,7 @@ void main() {
       PersonAskedToCloseTrajectory(
         addressInExternalSystem: thread(t),
         containingAddress: channel,
+        addressedTo: null,
         from: ActorId.parse('teams:t/q')!,
         key: EventKey.parse(key)!,
         message: SourceMessageId.parse('$t|card')!,

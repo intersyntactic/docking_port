@@ -29,7 +29,8 @@ const readingNodeShapes = <String, Set<String>>{
 /// [reading] as JSON:
 ///
 ///     {"case": <case>, "addressInExternalSystem": <id>,
-///      "containingAddress": <id>?, "key": <key>, ...the case's own fields}
+///      "containingAddress": <id>?, "addressedTo": <actor>?, "key": <key>,
+///      ...the case's own fields}
 ///
 /// `<case>` and its fields are `message-said`, with `"node"`, a
 /// [UserSaid]; `message-changed`, with `"from"?`, `"message"` and
@@ -41,6 +42,7 @@ JsonObject encodeReading(AddressedEvent reading) => JsonObject.of({
   'case': _case(reading),
   'addressInExternalSystem': reading.addressInExternalSystem.value,
   'containingAddress': ?reading.containingAddress?.value,
+  'addressedTo': ?reading.addressedTo?.value,
   'key': reading.key.value,
   ...switch (reading) {
     MessageSaid(:final node) => {'node': node.toJson()},
@@ -85,6 +87,9 @@ AddressedEvent decodeReading(JsonObject json) {
   final containingAddress = json.has('containingAddress')
       ? _parse(json, 'containingAddress', AddressInExternalSystem.parse)
       : null;
+  final addressedTo = json.has('addressedTo')
+      ? _parse(json, 'addressedTo', ActorId.parse)
+      : null;
   final key = _parse(json, 'key', EventKey.parse);
   ActorId? from() =>
       json.has('from') ? _parse(json, 'from', ActorId.parse) : null;
@@ -94,6 +99,7 @@ AddressedEvent decodeReading(JsonObject json) {
       MessageSaid(
         addressInExternalSystem: addressInExternalSystem,
         containingAddress: containingAddress,
+        addressedTo: addressedTo,
         key: key,
         node: UserSaid.fromJson(json.object('node')),
       ),
@@ -103,6 +109,7 @@ AddressedEvent decodeReading(JsonObject json) {
       MessageChanged(
         addressInExternalSystem: addressInExternalSystem,
         containingAddress: containingAddress,
+        addressedTo: addressedTo,
         from: from(),
         key: key,
         message: _parse(json, 'message', SourceMessageId.parse),
@@ -114,6 +121,7 @@ AddressedEvent decodeReading(JsonObject json) {
       ActorsJoinedAddress.of(
             addressInExternalSystem: addressInExternalSystem,
             containingAddress: containingAddress,
+            addressedTo: addressedTo,
             from: from(),
             key: key,
             joiners: [
@@ -129,6 +137,7 @@ AddressedEvent decodeReading(JsonObject json) {
       ShownMessageJudged(
         addressInExternalSystem: addressInExternalSystem,
         containingAddress: containingAddress,
+        addressedTo: addressedTo,
         from: _parse(json, 'from', ActorId.parse),
         key: key,
         to: _parse(json, 'to', SourceMessageId.parse),
@@ -140,6 +149,7 @@ AddressedEvent decodeReading(JsonObject json) {
       PersonAskedToCloseTrajectory(
         addressInExternalSystem: addressInExternalSystem,
         containingAddress: containingAddress,
+        addressedTo: addressedTo,
         from: _parse(json, 'from', ActorId.parse),
         key: key,
         message: _parse(json, 'message', SourceMessageId.parse),
@@ -153,6 +163,7 @@ AddressedEvent decodeReading(JsonObject json) {
       'case',
       'addressInExternalSystem',
       'containingAddress',
+      'addressedTo',
       'key',
       ...fields,
     }.contains(field)) {

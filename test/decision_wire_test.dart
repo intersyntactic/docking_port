@@ -23,11 +23,13 @@ final addressInExternalSystem = AddressInExternalSystem.parse(
 final containingAddress = AddressInExternalSystem.parse('teams:19:x')!;
 final key = EventKey.parse('message:1')!;
 final from = ActorId.parse('teams:t/p')!;
+final bot = ActorId.parse('teams:t/bot:app')!;
 final message = SourceMessageId.parse('19:x;messageid=1|1')!;
 
 final said = MessageSaid(
   addressInExternalSystem: addressInExternalSystem,
   containingAddress: containingAddress,
+  addressedTo: bot,
   key: key,
   node: UserSaid(author: from, source: message, text: 'hi'),
 );
@@ -38,6 +40,7 @@ final readings = <AdmissibleEvent>[
   MessageChanged(
     addressInExternalSystem: addressInExternalSystem,
     containingAddress: containingAddress,
+    addressedTo: bot,
     from: from,
     key: key,
     message: message,
@@ -46,6 +49,7 @@ final readings = <AdmissibleEvent>[
   MessageChanged(
     addressInExternalSystem: addressInExternalSystem,
     containingAddress: null,
+    addressedTo: null,
     from: null,
     key: key,
     message: message,
@@ -54,6 +58,7 @@ final readings = <AdmissibleEvent>[
   ActorsJoinedAddress.of(
     addressInExternalSystem: containingAddress,
     containingAddress: null,
+    addressedTo: null,
     from: from,
     key: key,
     joiners: [from, ActorId.parse('teams:bot')!],
@@ -61,6 +66,7 @@ final readings = <AdmissibleEvent>[
   ShownMessageJudged(
     addressInExternalSystem: addressInExternalSystem,
     containingAddress: containingAddress,
+    addressedTo: bot,
     from: from,
     key: key,
     to: message,
@@ -71,6 +77,7 @@ final readings = <AdmissibleEvent>[
 final closeAsked = PersonAskedToCloseTrajectory(
   addressInExternalSystem: addressInExternalSystem,
   containingAddress: containingAddress,
+  addressedTo: bot,
   from: from,
   key: EventKey.parse('invoke:1')!,
   message: message,
@@ -100,7 +107,7 @@ void main() {
       _text(entry),
       '{"event":"$_a","by":"rules","reading":{"case":"message-said",'
       '"addressInExternalSystem":"teams:19:x;messageid=1",'
-      '"containingAddress":"teams:19:x",'
+      '"containingAddress":"teams:19:x","addressedTo":"teams:t/bot:app",'
       '"key":"message:1","node":{"shape":"UserSaid","author":"teams:t/p",'
       '"source":"19:x;messageid=1|1","text":"hi"}},'
       '"startsTrajectory":true,"startsMission":true,'
@@ -185,6 +192,7 @@ void main() {
       ],
     );
     expect(encodeReading(said).string('containingAddress'), 'teams:19:x');
+    expect(encodeReading(said).string('addressedTo'), 'teams:t/bot:app');
   });
 
   test('every case reads back as what was written, whoever decided it', () {
@@ -378,6 +386,20 @@ void main() {
         {
           ...good,
           'reading': {...reading, 'containingAddress': null},
+        },
+      ),
+      (
+        DecisionEntryKind.eventAdmittedToMission,
+        {
+          ...good,
+          'reading': {...reading, 'addressedTo': null},
+        },
+      ),
+      (
+        DecisionEntryKind.eventAdmittedToMission,
+        {
+          ...good,
+          'reading': {...reading, 'addressedTo': 'not an actor'},
         },
       ),
       (
